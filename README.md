@@ -22,6 +22,3 @@ We are currently in the deep-design phase. Our main focus right now is building 
 > "Do or do not. There is no try."
 
 Check back soon! We are currently meditating on the software architecture and batteling with stubborn ZigBee protocol.
-
-
-test
