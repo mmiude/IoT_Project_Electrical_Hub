@@ -11,13 +11,14 @@ devices run so you're always using the "cheapest" electrons available.
 We are currently in the deep-design phase. Our main focus right now is building a robust software architecture that isn't just a "one-off" script, but is easy to maintain, scale, and develop further.
 
 ### 🛠️ The Plan
-🏗️ Solid Foundation: Designing a modular software architecture for future-proof development.
-🌐 Market Integration: Connecting to live electricity price APIs to get those sweet, sweet data points.
-🐝 ZigBee Mastery: Learning and implementing ZigBee protocol so our hub can "talk" to smart plugs wirelessly.
-🧠 Brain Power: Building the core logic that decides exactly when to cut the juice and when to let it flow.
-👉 User Control: Building a local UI via an on-device touch screen for quick, hands-on toggling. 
-🖥️ Monitoring: Developing a web-based Dashboard for remote monitoring.
+* **🏗️ Solid Foundation:** Designing a modular software architecture for future-proof development.
+* **🌐 Market Integration:** Connecting to live electricity price APIs to get those sweet, sweet data points.
+* **🐝 ZigBee Mastery:** Learning and implementing ZigBee protocol so our hub can "talk" to smart plugs wirelessly.
+* **🧠 Brain Power:** Building the core logic that decides exactly when to cut the juice and when to let it flow.
+* **👉 User Control:** Building a local UI via an on-device touch screen for quick, hands-on toggling. 
+* **🖥️ Monitoring:** Developing a web-based Dashboard for remote monitoring.
 
 ### 🏃‍♂️ Running it (for now)
-"Do or do not. There is no try."
+> "Do or do not. There is no try."
+
 Check back soon! We are currently meditating on the software architecture and batteling with stubborn ZigBee protocol.
