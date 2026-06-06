@@ -29,7 +29,32 @@
 
 static const char *TAG = "ZIGBEE_COORDINATOR";
 
-static uint16_t smart_plugs = 0;
+typedef struct {
+    uint16_t short_address;
+    uint8_t endpoint;
+    bool online;
+    bool is_on; 
+
+    uint16_t current_divisor;
+    uint16_t current_multiplier;
+    uint16_t voltage_divisor;
+    uint16_t voltage_multiplier;
+    uint16_t power_divisor;
+    uint16_t power_multiplier;
+    bool support_metering;
+    uint32_t metering_divisor;
+    uint32_t metering_multiplier;
+
+    float active_power;
+    float voltage; 
+    float current;
+    float summation_kwh; 
+
+} smartplugInfo;
+
+//static uint16_t smart_plugs[3] = {0, 0, 0};
+static smartplugInfo smartPlug;
+//static int smart_index = 0;
 
 esp_err_t send_configure_reporting(uint16_t dst_addr, uint8_t dst_ep);
 
@@ -309,7 +334,12 @@ static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, 
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
             //ESP_LOGW(TAG, "SHORT ADDRESS: %d", (uint16_t) user_ctx);
-            send_configure_reporting(smart_plugs, 1);
+            //send_configure_reporting(smart_plugs[smart_index], 1);
+            esp_zigbee_lock_acquire(portMAX_DELAY);
+            send_configure_reporting(smartPlug.short_address, smartPlug.endpoint);
+            read_electrical_measurement_multipliers(smartPlug.short_address, smartPlug.endpoint);
+            read_energy_consumption_multipliers(smartPlug.short_address, smartPlug.endpoint);
+            esp_zigbee_lock_release(); 
 
         } else {
             ESP_LOGE(TAG, "Failed to bind smart plug device with status (0x%02x)", result->rsp->status);
@@ -363,6 +393,7 @@ static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_resul
             result->rsp->match_list) {
             for (size_t i = 0; i < result->rsp->match_length; i++) {
                 ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
+                smartPlug.endpoint = result->rsp->match_list[i];
                 zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
             }
         }
@@ -373,8 +404,11 @@ static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_resul
 
 static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
 {   
+    /*if (smart_index > 2) smart_index = 0;
+    smart_plugs[smart_index] = dst_addr;
+    smart_index++; */
 
-    smart_plugs = dst_addr;
+    smartPlug.short_address = dst_addr;
 
     ezb_err_t ret             = EZB_ERR_FAIL;
     uint16_t  cluster_list[] = {EZB_ZCL_CLUSTER_ID_ON_OFF};
@@ -463,7 +497,7 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
         const ezb_zdo_signal_device_annce_params_t *dev_annce_params = ezb_app_signal_get_params(app_signal);
         ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->short_addr); // devices shrot address 
         zdo_find_smart_plug_device(dev_annce_params->short_addr);
-        smart_plugs = dev_annce_params->short_addr;
+        //smart_plugs = dev_annce_params->short_addr;
         //send_configure_reporting(dev_annce_params->short_addr, 1);
     } break;
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: {
@@ -527,16 +561,19 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     ESP_RETURN_ON_FALSE(message, , TAG, "message is empty");
 
     ezb_zcl_report_attr_variable_t *response = message->in.variables; 
+    const ezb_zcl_cmd_hdr_t *header = message->in.header; 
 
-    ESP_LOGI(TAG, "Attr report from ep(%d) attr(0x%04x) data type(0x%04x)",
-        message->info.dst_ep,
+    ESP_LOGI(TAG, "Attr report from smart plug(%d) addr(%d) attr(0x%04x) data type(0x%04x)",
+        header->src_ep,
+        header->src_addr,
         response->attr_id,
         response->attr_type);
 
     if (response->attr_id == EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) 
     {
-        bool is_on = *(bool *)response->attr_value; 
-        ESP_LOGI(TAG, "Plug ep(%d) on/off state: %s", message->info.dst_ep, is_on ? "ON" : "OFF");
+        bool is_on = *(bool *)response->attr_value;
+        smartPlug.is_on = is_on; 
+        ESP_LOGI(TAG, "Plug ep(%d) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
     }
     else
     {
@@ -547,57 +584,89 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
 static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t *message)
 {
     ezb_zcl_read_attr_rsp_variable_t *response = message->in.variables;
+    const ezb_zcl_cmd_hdr_t *header = message->in.header;
+
+    ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(%d)", header->src_ep, header->src_addr.u.short_addr);
+    // TODO: here we need to somehow set metering -> false if not supported and if electrical is not supported we don't add that plug at all. 
+    if (response->status != 0) ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(%d)", response->attr_id, header->src_addr.u.short_addr);
 
     while (response != NULL && response->status == 0) {
         
         switch (message->info.cluster_id) 
         {
         case EZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT: // value is in response->attr_value
+            
             switch (response->attr_id)
             {
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID:
-                    ESP_LOGW(TAG, "Electrical active power: status: %d, type: %d", response->status, response->attr_type);
+                    int16_t power = *(int16_t *) response->attr_value;
+                    //ESP_LOGW(TAG, "Electrical active power: status: %d, type: %d, value: %d", response->status, response->attr_type, power);
+                    smartPlug.active_power = power / (float)smartPlug.power_divisor * smartPlug.power_multiplier;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_ID:
-                    ESP_LOGW(TAG, "Electrical rms voltage: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t voltage = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical rms voltage: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage);
+                    smartPlug.voltage = voltage / (float)smartPlug.voltage_divisor * smartPlug.voltage_multiplier;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_ID:
-                    ESP_LOGW(TAG, "Electrical rms current: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t current = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical rms current: status: %d, type: %d, value: %d, divisor: %d", response->status, response->attr_type, current, smartPlug.current_divisor);
+                    smartPlug.current = current / (float)smartPlug.current_divisor * smartPlug.current_multiplier;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID:
-                    ESP_LOGW(TAG, "Electrical ac power multiplier: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t power_multi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac power multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, power_multi);
+                    smartPlug.power_multiplier = power_multi;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_DIVISOR_ID:
-                    ESP_LOGW(TAG, "Electrical ac power divisor: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t power_divi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac power divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, power_divi);
+                    smartPlug.power_divisor = power_divi;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_DIVISOR_ID:
-                    ESP_LOGW(TAG, "Electrical ac voltage divisor: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t voltage_divi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac voltage divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_divi);
+                    smartPlug.voltage_divisor = voltage_divi;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID:
-                    ESP_LOGW(TAG, "Electrical ac voltage multiplier: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t voltage_multi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac voltage multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_multi);
+                    smartPlug.voltage_multiplier = voltage_multi; 
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID:
-                    ESP_LOGW(TAG, "Electrical ac current multiplier: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t current_multi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac current multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, current_multi);
+                    smartPlug.current_multiplier = current_multi;
                     break;
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_DIVISOR_ID:
-                    ESP_LOGW(TAG, "Electrical ac current divisor: status: %d, type: %d", response->status, response->attr_type);
+                    uint16_t current_divi = *(uint16_t *) response->attr_value; 
+                    //ESP_LOGW(TAG, "Electrical ac current divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, current_divi);
+                    smartPlug.current_divisor = current_divi;
                     break;
                 default:
-                    ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (electrical).");
+                    //ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (electrical).");
                     break;
             }
             break;
         case EZB_ZCL_CLUSTER_ID_METERING: // value is in response->attr_value
+            smartPlug.support_metering = true;
+
             switch (response->attr_id)
             {
                 case EZB_ZCL_ATTR_METERING_CURRENT_SUMMATION_DELIVERED_ID:
-                    ESP_LOGW(TAG, "Metering current summation: status: %d, type: %d", response->status, response->attr_type);
+                    uint64_t summation = *(uint64_t *) response->attr_value;
+                    //ESP_LOGW(TAG, "Metering current summation: status: %d, type: %d, value: %d", response->status, response->attr_type, summation);
+                    smartPlug.summation_kwh = summation / (float)smartPlug.metering_divisor * smartPlug.metering_multiplier;
                     break;
                 case EZB_ZCL_ATTR_METERING_MULTIPLIER_ID:
-                    ESP_LOGW(TAG, "Metering multiplier: status: %d, type: %d", response->status, response->attr_type);
+                    uint32_t metering_multi = *(uint32_t *) response->attr_value;
+                    //ESP_LOGW(TAG, "Metering multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_multi);
+                    smartPlug.metering_multiplier = metering_multi;
                     break;              
                 case EZB_ZCL_ATTR_METERING_DIVISOR_ID:
-                    ESP_LOGW(TAG, "Metering divisor: status: %d, type: %d", response->status, response->attr_type);
+                    uint32_t metering_divi = *(uint32_t *) response->attr_value;
+                    //ESP_LOGW(TAG, "Metering divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_divi);
+                    smartPlug.metering_divisor = metering_divi;
                     break;
                 default:
                     ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (metering).");
@@ -628,7 +697,9 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
 
         case EZB_ZCL_CORE_CONFIG_REPORT_RSP_CB_ID: // 0x0003
             ezb_zcl_cmd_config_report_rsp_message_t *rsp = (ezb_zcl_cmd_config_report_rsp_message_t *)message;
-            ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x)", rsp->info.cluster_id);
+            const ezb_zcl_cmd_hdr_t *header = rsp->in.header;
+
+            ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(%d)", rsp->info.cluster_id, header->src_addr.u.short_addr);
 
             ezb_zcl_config_report_rsp_variable_t *var = rsp->in.variables;
             while (var != NULL) {
@@ -646,8 +717,10 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
         case EZB_ZCL_CORE_DEFAULT_RSP_CB_ID: // THIS WORKSSS YAYYYYY 
             // Fires after spikestriker sends ON/OFF commands - check if succeeded
             ezb_zcl_cmd_default_rsp_message_t *resp = (ezb_zcl_cmd_default_rsp_message_t *)message;
-            ESP_LOGI(TAG, "Command response from ep(%d): status(0x%02x) %s",
+            const ezb_zcl_cmd_hdr_t *header_ = resp->in.header;
+            ESP_LOGI(TAG, "Command response from ep(%d) smart plug(%d): status(0x%02x) %s",
                  resp->info.dst_ep,
+                 header_->src_addr.u.short_addr,
                  resp->info.status,
                  resp->info.status == 0 ? "OK" : "FAILED");
             break;
@@ -772,21 +845,19 @@ static void esp_zigbee_stack_main_task(void *pvParameters)
 
 static void dummy_toggle_task(void *pvParameters)
 {   
-    vTaskDelay(pdMS_TO_TICKS(20000));
-    esp_zigbee_lock_acquire(portMAX_DELAY);
-    read_electrical_measurement_multipliers(smart_plugs, 1);
-    read_energy_consumption_multipliers(smart_plugs, 1);
-    esp_zigbee_lock_release(); 
-
     while (1) {
+        printf("SMART PLUG: %d ****** INFO ***** \n", smartPlug.short_address);
+        printf("plug on/off state: %s\n", smartPlug.is_on ? "ON" : "OFF");
+        printf("current: %.4f A\n", smartPlug.current);
+        printf("voltage: %.2f V\n", smartPlug.voltage);
+        printf("active power: %.2f W\n", smartPlug.active_power);
+        printf("energy summation: %.2f kwh\n", smartPlug.summation_kwh);
         vTaskDelay(pdMS_TO_TICKS(20000));
         esp_zigbee_lock_acquire(portMAX_DELAY);
-        send_toggle_smart_plug(smart_plugs, 1);
-        esp_zigbee_lock_release();
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        esp_zigbee_lock_acquire(portMAX_DELAY);
-        read_energy_consumption_value(smart_plugs, 1);
-        read_electrical_measurement_values(smart_plugs, 1);
+        send_toggle_smart_plug(smartPlug.short_address, smartPlug.endpoint);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        read_energy_consumption_value(smartPlug.short_address, smartPlug.endpoint);
+        read_electrical_measurement_values(smartPlug.short_address, smartPlug.endpoint);
         esp_zigbee_lock_release(); 
     }
 }
