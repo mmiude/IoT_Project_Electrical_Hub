@@ -9,17 +9,17 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
-#if CONFIG_EXAMPLE_CONNECT_WIFI
+/*#if CONFIG_EXAMPLE_CONNECT_WIFI
 #include "protocol_examples_common.h"
 #include "esp_wifi.h"
-#endif
+// #endif*/
 
 
-#if CONFIG_ESP_COEX_SW_COEXIST_ENABLE
+/*#if CONFIG_ESP_COEX_SW_COEXIST_ENABLE
 #include "esp_coexist.h"
-#endif
+#endif*/
 
-#include "light_driver.h"
+//#include "light_driver.h"
 #include "alarm_timer.h"
 
 #include "esp_zigbee.h"
@@ -52,13 +52,11 @@ typedef struct {
 
 } smartplugInfo;
 
-//static uint16_t smart_plugs[3] = {0, 0, 0};
 static smartplugInfo smartPlug;
-//static int smart_index = 0;
 
 esp_err_t send_configure_reporting(uint16_t dst_addr, uint8_t dst_ep);
 
-static esp_err_t deferred_driver_init(void)
+/*static esp_err_t deferred_driver_init(void)
 {
     static bool is_inited = false;
 
@@ -68,9 +66,9 @@ static esp_err_t deferred_driver_init(void)
     is_inited = true;
 
     return ESP_OK;
-}
+}*/
 
-static ezb_err_t read_available_attributes(uint16_t dst_addr, uint8_t dst_ep)
+/*static ezb_err_t read_available_attributes(uint16_t dst_addr, uint8_t dst_ep)
 {
 
     uint16_t attr_fields[3] = {
@@ -108,7 +106,7 @@ static ezb_err_t read_available_attributes(uint16_t dst_addr, uint8_t dst_ep)
 
     ezb_err_t err = ezb_zcl_read_attr_cmd_req(&disc_attr_cmd);
     return err == EZB_ERR_NONE ? ESP_OK : ESP_FAIL; 
-}
+}*/
 
 static ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep)
 {
@@ -364,7 +362,7 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
                 .cluster_id = EZB_ZCL_CLUSTER_ID_ON_OFF,
             },
         .cb       = zdo_bind_smart_plug_result,
-        .user_ctx = (void *) dst_short_addr, //(void*) dst_short_addr,
+        //.user_ctx = (void *) dst_short_addr, //(void*) dst_short_addr,
     };
     ezb_address_extended_by_short(dst_short_addr, &bind_req.field.src_addr);
     ezb_nwk_get_extended_address(&bind_req.field.dst_addr.extended_addr);
@@ -458,7 +456,7 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     case EZB_BDB_SIGNAL_DEVICE_REBOOT: {
         ezb_bdb_comm_status_t status = *((ezb_bdb_comm_status_t *)ezb_app_signal_get_params(app_signal)); //obtains pointer to parameters passed with application signal 
         if (status == EZB_BDB_STATUS_SUCCESS) {
-            ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
+            //ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
             ESP_LOGI(TAG, "Device started up in%s factory-reset mode", ezb_bdb_is_factory_new() ? "" : " non");
             if (ezb_bdb_is_factory_new()) {
                 ESP_ERROR_CHECK(ezb_bdb_start_top_level_commissioning(EZB_BDB_MODE_NETWORK_FORMATION));
@@ -696,33 +694,33 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
             break;
 
         case EZB_ZCL_CORE_CONFIG_REPORT_RSP_CB_ID: // 0x0003
-            ezb_zcl_cmd_config_report_rsp_message_t *rsp = (ezb_zcl_cmd_config_report_rsp_message_t *)message;
-            const ezb_zcl_cmd_hdr_t *header = rsp->in.header;
+            ezb_zcl_cmd_config_report_rsp_message_t *config_response = (ezb_zcl_cmd_config_report_rsp_message_t *)message;
+            const ezb_zcl_cmd_hdr_t *config_header = config_response->in.header;
 
-            ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(%d)", rsp->info.cluster_id, header->src_addr.u.short_addr);
+            ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(%d)", config_response->info.cluster_id, config_header->src_addr.u.short_addr);
 
-            ezb_zcl_config_report_rsp_variable_t *var = rsp->in.variables;
-            while (var != NULL) {
-                if (var->status == EZB_ZCL_STATUS_SUCCESS) {
+            ezb_zcl_config_report_rsp_variable_t *config_response_variable = config_response->in.variables;
+            while (config_response_variable != NULL) {
+                if (config_response_variable->status == EZB_ZCL_STATUS_SUCCESS) {
                     ESP_LOGI(TAG, "  All attributes accepted (status SUCCESS)");
                 } else {
                     ESP_LOGW(TAG, "  attr(0x%04x) FAILED with status(0x%02x)",
-                     var->attr_id, var->status);
+                     config_response_variable->attr_id, config_response_variable->status);
                 }
-                var = var->next;
+                config_response_variable = config_response_variable->next;
             }
-            rsp->out.result = EZB_ZCL_STATUS_SUCCESS;
+            config_response->out.result = EZB_ZCL_STATUS_SUCCESS;
             break;
 
         case EZB_ZCL_CORE_DEFAULT_RSP_CB_ID: // THIS WORKSSS YAYYYYY 
             // Fires after spikestriker sends ON/OFF commands - check if succeeded
-            ezb_zcl_cmd_default_rsp_message_t *resp = (ezb_zcl_cmd_default_rsp_message_t *)message;
-            const ezb_zcl_cmd_hdr_t *header_ = resp->in.header;
+            ezb_zcl_cmd_default_rsp_message_t *default_response = (ezb_zcl_cmd_default_rsp_message_t *)message;
+            const ezb_zcl_cmd_hdr_t *default_header = default_response->in.header;
             ESP_LOGI(TAG, "Command response from ep(%d) smart plug(%d): status(0x%02x) %s",
-                 resp->info.dst_ep,
-                 header_->src_addr.u.short_addr,
-                 resp->info.status,
-                 resp->info.status == 0 ? "OK" : "FAILED");
+                 default_response->info.dst_ep,
+                 default_header->src_addr.u.short_addr,
+                 default_response->info.status,
+                 default_response->info.status == 0 ? "OK" : "FAILED");
             break;
 
         default:
@@ -846,6 +844,14 @@ static void esp_zigbee_stack_main_task(void *pvParameters)
 static void dummy_toggle_task(void *pvParameters)
 {   
     while (1) {
+
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        read_energy_consumption_value(smartPlug.short_address, smartPlug.endpoint);
+        read_electrical_measurement_values(smartPlug.short_address, smartPlug.endpoint);
+        esp_zigbee_lock_release(); 
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+
         printf("SMART PLUG: %d ****** INFO ***** \n", smartPlug.short_address);
         printf("plug on/off state: %s\n", smartPlug.is_on ? "ON" : "OFF");
         printf("current: %.4f A\n", smartPlug.current);
@@ -853,12 +859,7 @@ static void dummy_toggle_task(void *pvParameters)
         printf("active power: %.2f W\n", smartPlug.active_power);
         printf("energy summation: %.2f kwh\n", smartPlug.summation_kwh);
         vTaskDelay(pdMS_TO_TICKS(20000));
-        esp_zigbee_lock_acquire(portMAX_DELAY);
-        send_toggle_smart_plug(smartPlug.short_address, smartPlug.endpoint);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        read_energy_consumption_value(smartPlug.short_address, smartPlug.endpoint);
-        read_electrical_measurement_values(smartPlug.short_address, smartPlug.endpoint);
-        esp_zigbee_lock_release(); 
+        
     }
 }
 
