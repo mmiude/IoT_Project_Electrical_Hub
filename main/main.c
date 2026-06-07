@@ -17,6 +17,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -116,6 +117,13 @@ void wifi_init()
 
 void app_main(void)
 {
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
     wifi_init();
 
     uint8_t mac[6];
@@ -126,11 +134,15 @@ void app_main(void)
         printf("No MAC found\n");
     }
 
-    for (int i = 10; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
+    while (true) {
+        printf("Connected yaaaay :)");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    printf("Restarting now.\n");
-    fflush(stdout);
-    esp_restart();
+    // for (int i = 10; i >= 0; i--) {
+    //     printf("Restarting in %d seconds...\n", i);
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // }
+    // printf("Restarting now.\n");
+    // fflush(stdout);
+    // esp_restart();
 }
