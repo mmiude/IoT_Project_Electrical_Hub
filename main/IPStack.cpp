@@ -24,14 +24,14 @@ IPStack::IPStack(const char *ssid, const char *pw, EventGroupHandle_t event_grou
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT,
         ESP_EVENT_ANY_ID,
-        &event_handler,
+        &wifi_event_handler,
         static_cast<void *>(this),
         &instance_any_id)
     );
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT,
         IP_EVENT_STA_GOT_IP,
-        &event_handler,
+        &wifi_event_handler,
         static_cast<void *>(this),
         &instance_got_ip)
     );
@@ -64,7 +64,7 @@ IPStack::IPStack(const char *ssid, const char *pw, EventGroupHandle_t event_grou
     }
 }
 
-void IPStack::event_handler(void* arg, esp_event_base_t event_base,
+void IPStack::wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
     auto ipstack = static_cast<IPStack*>(arg);
@@ -86,5 +86,158 @@ void IPStack::event_handler(void* arg, esp_event_base_t event_base,
         s_retry_num = 0;
         xEventGroupSetBits(ipstack->eg, WIFI_CONNECTED_BIT);
     }
+}
+
+esp_err_t IPStack::http_event_handler(esp_http_client_event_t *evt)
+{
+    static char *output_buffer;  // Buffer to store response of http request from event handler
+    static int output_len;       // Stores number of bytes read
+    
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            break;
+        case HTTP_EVENT_ON_HEADERS_COMPLETE:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADERS_COMPLETE");
+            break;
+        case HTTP_EVENT_ON_DATA:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            // Clean the buffer in case of a new request
+            if (output_len == 0 && evt->user_data) {
+                // we are just starting to copy the output data into the use
+                memset(evt->user_data, 0, MAX_HTTP_OUTPUT_BUFFER);
+            }
+            /*
+             * Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+             * However, event handler can also be used in case chunked encoding is used.
+             */
+            if (!esp_http_client_is_chunked_response(evt->client)) {
+                // If user_data buffer is configured, copy the response into the buffer
+                int copy_len = 0;
+                if (evt->user_data) {
+                    // The last byte in evt->user_data is kept for the NULL character in case of out-of-bound access.
+                    copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
+                    if (copy_len) {
+                        // FIX 1: Cast void* to char* so the compiler knows how many bytes to offset
+                        memcpy((char *)evt->user_data + output_len, evt->data, copy_len);
+                    }
+                } else {
+                    int content_len = esp_http_client_get_content_length(evt->client);
+                    if (output_buffer == NULL) {
+                        // We initialize output_buffer with 0 because it is used by strlen() and similar functions therefore should be null terminated.
+                        output_buffer = (char *) calloc(content_len + 1, sizeof(char));
+                        output_len = 0;
+                        if (output_buffer == NULL) {
+                            ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
+                            return ESP_FAIL;
+                        }
+                    }
+                    copy_len = MIN(evt->data_len, (content_len - output_len));
+                    if (copy_len) {
+                        memcpy(output_buffer + output_len, evt->data, copy_len);
+                    }
+                }
+                output_len += copy_len;
+            }
+
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
+            if (output_buffer != NULL) {
+#if CONFIG_EXAMPLE_ENABLE_RESPONSE_BUFFER_DUMP
+                ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
+#endif
+                free(output_buffer);
+                output_buffer = NULL;
+            }
+            output_len = 0;
+            break;
+            
+        case HTTP_EVENT_DISCONNECTED: { // FIX 2: Added opening brace for scope isolation
+            ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+            int mbedtls_err = 0;
+            esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
+            if (err != 0) {
+                ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
+                ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
+            }
+            if (output_buffer != NULL) {
+                free(output_buffer);
+                output_buffer = NULL;
+            }
+            output_len = 0;
+            break;
+        } // FIX 2: Added closing brace
+
+        case HTTP_EVENT_REDIRECT:
+            ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
+            esp_http_client_set_header(evt->client, "From", "user@example.com");
+            esp_http_client_set_header(evt->client, "Accept", "text/html");
+            esp_http_client_set_redirection(evt->client);
+            break;
+            
+        case HTTP_EVENT_ON_STATUS_CODE: // FIX 3: Handled missing enum warning
+            ESP_LOGD(TAG, "HTTP_EVENT_ON_STATUS_CODE");
+            break;
+            
+        default:
+            break;
+    }
+    return ESP_OK;
+}
+
+bool IPStack::http_request(const char *hostname, int port, char *response_buff,
+                    const char *path, const char *query, const char *body_data,
+                    esp_http_client_method_t method)
+{
+    esp_http_client_config_t config = {};
+    config.host = hostname;
+    config.port = port,
+    config.path = path;
+    config.method = method;
+    config.query = query;
+    config.event_handler = http_event_handler;
+    config.user_data = response_buff;
+    config.disable_auto_redirect = true;
+
+    bool success = false;
+
+    ESP_LOGI(TAG, "HTTP %d %s", (int)method, hostname);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    switch (method)
+    {
+    case HTTP_METHOD_GET:
+        break;
+    case HTTP_METHOD_POST:
+        esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_post_field(client, body_data, strlen(body_data));
+        break;
+    default:
+        break;
+    }
+
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP %d Status = %d, content_length = %" PRId64,
+                (int)method,
+                esp_http_client_get_status_code(client),
+                esp_http_client_get_content_length(client));
+        success = true;
+    } else {
+        ESP_LOGE(TAG, "HTTP %d request failed: %s", (int)method, esp_err_to_name(err));
+    }
+    ESP_LOG_BUFFER_HEX(TAG, response_buff, strlen(response_buff));
+    ESP_ERROR_CHECK(esp_http_client_cleanup(client));
+    return success;
 }
 

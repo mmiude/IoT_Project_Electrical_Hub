@@ -13,8 +13,6 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_system.h"
-// #include "esp_mac.h"
-// #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -26,6 +24,34 @@
 
 
 static const char *TAG = "wifi station";
+
+void get_task(void *param)
+{
+    auto ipstack = static_cast<IPStack *>(param);
+    bool prev_request_was_get = false;
+
+    while (true)
+    {
+        char buffer[MAX_HTTP_OUTPUT_BUFFER + 1] = {0};
+        if (prev_request_was_get) {
+            if (ipstack->http_request("192.168.101.106", 3000, buffer, "/send", "", "{\"field1\":\"value1\"}", HTTP_METHOD_POST)) {
+                ESP_LOGI(TAG, "Success :)");
+            } else {
+                ESP_LOGI(TAG, "Failure :(");
+            }
+            prev_request_was_get = false;
+        } else {
+            if (ipstack->http_request("192.168.101.106", 3000, buffer)) {
+                ESP_LOGI(TAG, "Success :)");
+            } else {
+                ESP_LOGI(TAG, "Failure :(");
+            }
+            prev_request_was_get = true;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
 
 
 extern "C" void app_main(void)
@@ -48,10 +74,12 @@ extern "C" void app_main(void)
         printf("No MAC found\n");
     }
 
-    while (true) {
-        printf("Connected yaaaay :)");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
+    xTaskCreate(get_task, "GET_TEST", 4096, static_cast<void *>(&ipstack), tskIDLE_PRIORITY + 1, NULL);
+
+    // while (true) {
+    //     printf("Connected yaaaay :)");
+    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // }
     // for (int i = 10; i >= 0; i--) {
     //     printf("Restarting in %d seconds...\n", i);
     //     vTaskDelay(1000 / portTICK_PERIOD_MS);
