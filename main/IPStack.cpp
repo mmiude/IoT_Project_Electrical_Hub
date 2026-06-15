@@ -9,7 +9,7 @@ bool get_efuse_mac(uint8_t *mac)
 }
 
 IPStack::IPStack(const char *ssid, const char *pw, EventGroupHandle_t event_group)
-: eg(event_group), connected(false)
+: eg(event_group)/*, connected(false)*/
 {
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -46,22 +46,22 @@ IPStack::IPStack(const char *ssid, const char *pw, EventGroupHandle_t event_grou
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
-    EventBits_t bits = xEventGroupWaitBits(eg,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
+    // EventBits_t bits = xEventGroupWaitBits(eg,
+    //         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+    //         pdFALSE,
+    //         pdFALSE,
+    //         portMAX_DELAY);
 
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 ssid, pw);
-        connected = true;
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 ssid, pw);
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-    }
+    // if (bits & WIFI_CONNECTED_BIT) {
+    //     ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+    //              ssid, pw);
+    //     // connected = true;
+    // } else if (bits & WIFI_FAIL_BIT) {
+    //     ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+    //              ssid, pw);
+    // } else {
+    //     ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    // }
 }
 
 void IPStack::wifi_event_handler(void* arg, esp_event_base_t event_base,
@@ -197,7 +197,7 @@ esp_err_t IPStack::http_event_handler(esp_http_client_event_t *evt)
 
 bool IPStack::http_request(const char *hostname, int port, char *response_buff,
                     const char *path, const char *query, const char *body_data,
-                    esp_http_client_method_t method)
+                    esp_http_client_method_t method, std::map<std::string, std::string> headers)
 {
     esp_http_client_config_t config = {};
     config.host = hostname;
@@ -214,12 +214,16 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
     ESP_LOGI(TAG, "HTTP %d %s", (int)method, hostname);
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
+    for (auto const& [key, val] : headers) {
+        esp_http_client_set_header(client, key.c_str(), val.c_str());
+    }
+
     switch (method)
     {
     case HTTP_METHOD_GET:
         break;
     case HTTP_METHOD_POST:
-        esp_http_client_set_header(client, "Content-Type", "application/json");
+        // esp_http_client_set_header(client, "Content-Type", "application/json");
         esp_http_client_set_post_field(client, body_data, strlen(body_data));
         break;
     default:
@@ -228,11 +232,12 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
 
     esp_err_t err = esp_http_client_perform(client);
     if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
         ESP_LOGI(TAG, "HTTP %d Status = %d, content_length = %" PRId64,
                 (int)method,
-                esp_http_client_get_status_code(client),
+                status_code,
                 esp_http_client_get_content_length(client));
-        success = true;
+        success = status_code >= 200 && status_code < 300;
     } else {
         ESP_LOGE(TAG, "HTTP %d request failed: %s", (int)method, esp_err_to_name(err));
     }
@@ -240,4 +245,6 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
     ESP_ERROR_CHECK(esp_http_client_cleanup(client));
     return success;
 }
+
+// bool IPStack::operator()() { return connected; }
 

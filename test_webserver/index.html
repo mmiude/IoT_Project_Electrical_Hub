@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register hub</title>
+</head>
+<style>
+    #register_form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 11rem;
+        align-items: baseline;
+        margin-left: 40%;
+        margin-top: 100px;
+    }
+</style>
+<body>
+    <form id="register_form">
+        <div>
+            <label for="hub_id">Enter hub id:</label>
+            <input type="text" id="hub_id" name="hub_id">
+        </div>
+        <button type="submit">Submit</button>
+    </form>
+
+    <script type="text/javascript">
+        const form = document.getElementById("register_form");
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault()
+            const formData = new FormData(form)
+            
+            const req = await fetch(`/register_hub/${formData.get("hub_id")}`, {
+                method: "POST"
+            })
+            if (req.ok) {
+                alert("Device succesfylly registered")
+            } else {
+                const res = await req.text()
+                alert(res)
+            }
+        })
+    </script>
+</body>
+</html>
