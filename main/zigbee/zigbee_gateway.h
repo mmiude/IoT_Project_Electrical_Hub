@@ -44,7 +44,7 @@
         .platform_config = ESP_ZIGBEE_PLATFORM_CONFIG(), \
     };
 
-static const char *TAG = "ZIGBEE_GATWAY";
+
 
 typedef enum {
     ZIGBEE_EVENT_DEVICE_JOINED,

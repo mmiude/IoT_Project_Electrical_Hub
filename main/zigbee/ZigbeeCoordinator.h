@@ -17,7 +17,7 @@ private:
     void run();
 
     TaskHandle_t handle;
-    QueueHandle_t event_queue;
+    QueueHandle_t event_queue_t = NULL;
 
     //device map/vector/something to keep track of smart plugs
     std::map<uint16_t, smartPlug> devices;  

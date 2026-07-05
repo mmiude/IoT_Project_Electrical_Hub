@@ -10,6 +10,8 @@ Handles Zigbee network, stack and raw signals.*/
 #include "ezbee/zha.h"
 #include "zigbee_gateway.h"
 
+static const char *TAG = "ZIGBEE_GATWAY";
+
 static QueueHandle_t event_queue = NULL;
 
 QueueHandle_t zigbee_gateway_get_queue()
@@ -17,10 +19,12 @@ QueueHandle_t zigbee_gateway_get_queue()
     if (event_queue == NULL) {
         event_queue = xQueueCreate(20, sizeof(zigbee_event));
     }
-    return event_queue; 
+    ESP_LOGI(TAG, "Gateway queue created: %p", event_queue); 
+    return event_queue;
 }
+
  
-static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg) // gateway 
+static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg) 
 {
     //mandatory to acquire the lock before calling any Zigbee SDK APIs
     esp_zigbee_lock_acquire(portMAX_DELAY);
@@ -28,7 +32,7 @@ static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg) // gateway
     esp_zigbee_lock_release();
 }
 
-static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) // gateway
+static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) 
 {   
     //Obtains the type of the application signal 
     ezb_app_signal_type_t signal_type = ezb_app_signal_get_type(app_signal);
@@ -42,7 +46,6 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) //
     case EZB_BDB_SIGNAL_DEVICE_REBOOT: {
         ezb_bdb_comm_status_t status = *((ezb_bdb_comm_status_t *)ezb_app_signal_get_params(app_signal)); //obtains pointer to parameters passed with application signal 
         if (status == EZB_BDB_STATUS_SUCCESS) {
-            //ESP_LOGI(TAG, "Deferred driver initialization %s", deferred_driver_init() ? "failed" : "successful");
             ESP_LOGI(TAG, "Device started up in%s factory-reset mode", ezb_bdb_is_factory_new() ? "" : " non");
             if (ezb_bdb_is_factory_new()) {
                 ESP_ERROR_CHECK(ezb_bdb_start_top_level_commissioning(EZB_BDB_MODE_NETWORK_FORMATION));
@@ -79,7 +82,10 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) //
     } break;
     case EZB_ZDO_SIGNAL_DEVICE_ANNCE: {
         const ezb_zdo_signal_device_annce_params_t *dev_annce_params = ezb_app_signal_get_params(app_signal);
-        ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->short_addr); // devices shrot address 
+        ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->short_addr);
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = dev_annce_params->short_addr};   
+        ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+        xQueueSend(event_queue, &event, 0); 
         //zdo_find_smart_plug_device(dev_annce_params->short_addr); binding will happen on coordinator side
         //smart_plugs = dev_annce_params->short_addr; // TODO: send short address to coordinator -> binds and sends configuration
         //send_configure_reporting(dev_annce_params->short_addr, 1);
@@ -261,16 +267,13 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
         case EZB_ZCL_CORE_REPORT_ATTR_CB_ID: //EZB_ZCL_CORE_REPORT_ATTR_CB_ID 
             zcl_core_report_attr_handler((ezb_zcl_cmd_report_attr_message_t *)message);
             break;
-
         case EZB_ZCL_CORE_READ_ATTR_RSP_CB_ID:
             zcl_core_read_attrbute_response((ezb_zcl_cmd_read_attr_rsp_message_t *)message);
             break;
-
         case EZB_ZCL_CORE_CONFIG_REPORT_RSP_CB_ID: // 0x0003
             zcl_core_read_config_report_response((ezb_zcl_cmd_config_report_rsp_message_t *)message);
             break;
-
-        case EZB_ZCL_CORE_DEFAULT_RSP_CB_ID: 
+        case EZB_ZCL_CORE_DEFAULT_RSP_CB_ID:    
             ezb_zcl_cmd_default_rsp_message_t *response = (ezb_zcl_cmd_default_rsp_message_t *)message;
             const ezb_zcl_cmd_hdr_t *header = response->in.header;
             ESP_LOGI(TAG, "Command response from ep(%d) smart plug(%d): status(0x%02x) %s",
@@ -279,7 +282,6 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
                  response->info.status,
                  response->info.status == 0 ? "OK" : "FAILED");
             break;
-
         default:
             ESP_LOGW(TAG, "Unhandled ZCL callback ID(0x%04lx)", callback_id);
             break;
@@ -335,6 +337,7 @@ void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
 
     ESP_ERROR_CHECK(esp_zigbee_start(false));
 
+    ESP_LOGI(TAG, "Starting zigbee main task");
     esp_zigbee_launch_mainloop();
 
     esp_zigbee_deinit();

@@ -9,7 +9,11 @@
 
 extern "C" void app_main(void)
 {
-    ZigbeeCoordinator coordinator; 
-    std::cout << "BOOT" << std::endl; 
+    ESP_ERROR_CHECK(nvs_flash_init());
+    ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
+
+    //zigbee_gateway_init_queue(); 
+
+    static ZigbeeCoordinator coordinator; 
     
 }

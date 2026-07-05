@@ -1,14 +1,13 @@
-#include <iostream>
 #include "ZigbeeCoordinator.h"
+
+static const char *TAG = "COORDINATOR"; 
 
 ZigbeeCoordinator::ZigbeeCoordinator(){
 
-    ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
-
+    event_queue_t = zigbee_gateway_get_queue();
     ESP_LOGI(TAG, "Start ESP Zigbee Stack");
     xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, NULL, tskIDLE_PRIORITY + 3, NULL); 
-    xTaskCreate(ZigbeeCoordinator::runner, "ZB_COORDINATOR", 4096, this, tskIDLE_PRIORITY + 2,  &handle);
+    xTaskCreate(ZigbeeCoordinator::runner, "ZB_COORDINATOR", 4096 * 2, this, tskIDLE_PRIORITY + 2,  &handle);
 
 }
 
@@ -19,13 +18,14 @@ void ZigbeeCoordinator::runner(void *params){
 
 void ZigbeeCoordinator::run(){
 
-    std::cout << "Starting Coordinator task" << std::endl; 
-    event_queue = zigbee_gateway_get_queue();
+    ESP_LOGI(TAG, "Starting the coordinatortask");
+    if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
+    ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
     zigbee_event event; 
 
     while (true) {
-        if (xQueueReceive(event_queue, &event, portMAX_DELAY) == pdPASS) {
-            std::cout << "Recieved an event from gateway..." << std::endl; 
+        if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
+            if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
         }
     }
 }
