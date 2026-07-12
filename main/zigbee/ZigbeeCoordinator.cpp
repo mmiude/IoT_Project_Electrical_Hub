@@ -11,6 +11,8 @@ ZigbeeCoordinator::ZigbeeCoordinator(){
 
 }
 
+// freeRTOS task methods
+
 void ZigbeeCoordinator::runner(void *params){
     auto instance = static_cast<ZigbeeCoordinator *>(params);
     instance->run(); 
@@ -25,11 +27,57 @@ void ZigbeeCoordinator::run(){
 
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
-            if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
+            if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) {
+                devices[event.short_address].short_addr = event.short_address;
+                binding_short_addr = event.short_address; 
+                ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
+                esp_zigbee_lock_acquire(portMAX_DELAY);
+                zdo_find_smart_plug_device(event.short_address);
+                esp_zigbee_lock_release();
+            } 
+            else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) {
+                ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
+            }
+            else if (event.type == ZIGBEE_EVENT_ONOFF_REPORT) {
+                ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", event.short_address, event.data.is_on ? "ON" : "OFF");
+            }
+            else if (event.type == ZIGBEE_EVENT_POWER_REPORT) {
+                ESP_LOGI(TAG, "smart plug: 0x%04hx power report", event.short_address);
+            }
+            else if (event.type == ZIGBEE_EVENT_VOLTAGE_REPORT) {
+                ESP_LOGI(TAG, "smart plug: 0x%04hx voltage report", event.short_address);
+            }
+            else if (event.type == ZIGBEE_EVENT_CURRENT_REPORT) {
+                ESP_LOGI(TAG, "smart plug: 0x%04hx current report", event.short_address);
+            }
+            else if (event.type == ZIGBEE_EVENT_SUMMATION_REPORT) {
+                ESP_LOGI(TAG, "smart plug: 0x%04hx summation report", event.short_address);
+            }
+            else ESP_LOGW(TAG, "unknown event type");
         }
     }
 }
 
+// public methods. Will be used through controller interface eventually. 
+
+void ZigbeeCoordinator::energy_consumption(){
+    for (const auto& [key, value] : devices) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        read_electrical_measurement_values(key, value.endpoint); 
+        esp_zigbee_lock_release();
+    }
+}
+
+void ZigbeeCoordinator::electrical_values(){
+    for (const auto& [key, value] : devices) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        read_energy_consumption_value(key, value.endpoint); 
+        esp_zigbee_lock_release();
+    }
+}
+
+
+// private methods 
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){
     uint16_t metering_attrs[] = {
         EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID,
@@ -321,6 +369,7 @@ void ZigbeeCoordinator::zdo_find_smart_plug_device_result(const ezb_zdo_match_de
             for (size_t i = 0; i < result->rsp->match_length; i++) {
                 ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
                 //smartPlug.endpoint = result->rsp->match_list[i];
+                static_cast<ZigbeeCoordinator*>(user_ctx)->devices[result->rsp->nwk_addr_of_interest].endpoint = result->rsp->match_list[i];
                 static_cast<ZigbeeCoordinator*>(user_ctx)->zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
             }
         }
@@ -331,7 +380,7 @@ void ZigbeeCoordinator::zdo_find_smart_plug_device_result(const ezb_zdo_match_de
 
 ezb_err_t ZigbeeCoordinator::zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst_ep){
     ezb_err_t          ret      = EZB_ERR_FAIL;
-    ESP_LOGW(TAG, "plug short address: %d", dst_short_addr);
+    //ESP_LOGW(TAG, "plug short address: %d", dst_short_addr);
 
     ezb_zdo_bind_req_t bind_req = {
         .dst_nwk_addr = dst_short_addr,
@@ -343,7 +392,7 @@ ezb_err_t ZigbeeCoordinator::zdo_bind_smart_plug_device(uint16_t dst_short_addr,
                 .dst_ep        = ESP_ZIGBEE_CUSTOM_GATEWAY_EP_ID,
             },
         .cb       = zdo_bind_smart_plug_result,
-        .user_ctx = this, 
+        .user_ctx = this,
     };
     ezb_address_extended_by_short(dst_short_addr, &bind_req.field.src_addr);
     ezb_nwk_get_extended_address(&bind_req.field.dst_addr.extended_addr);
@@ -364,15 +413,17 @@ ezb_err_t ZigbeeCoordinator::zdo_bind_smart_plug_device(uint16_t dst_short_addr,
     return ret;
 }
 
-    void ZigbeeCoordinator::zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, void *user_ctx){
+void ZigbeeCoordinator::zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, void *user_ctx){
     assert(result);
+    uint16_t short_address = static_cast<ZigbeeCoordinator*>(user_ctx)->binding_short_addr;
+    auto instance = static_cast<ZigbeeCoordinator*>(user_ctx); 
+
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
             //ESP_LOGW(TAG, "SHORT ADDRESS: %d", (uint16_t) user_ctx);
-            //send_configure_reporting(smart_plugs[smart_index], 1);
             esp_zigbee_lock_acquire(portMAX_DELAY);
-            //send_configure_reporting(smartPlug.short_address, smartPlug.endpoint);
+            instance->send_configure_reporting(instance->devices[short_address].short_addr, instance->devices[short_address].endpoint);
             //read_electrical_measurement_multipliers(smartPlug.short_address, smartPlug.endpoint);
             //read_energy_consumption_multipliers(smartPlug.short_address, smartPlug.endpoint);
             esp_zigbee_lock_release(); 

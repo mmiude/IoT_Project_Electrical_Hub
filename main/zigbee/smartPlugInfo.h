@@ -24,3 +24,4 @@ typedef struct smartPlugInfo {
     float summation_kwh; 
     
 } smartPlug;
+

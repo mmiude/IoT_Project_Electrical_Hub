@@ -45,7 +45,6 @@
     };
 
 
-
 typedef enum {
     ZIGBEE_EVENT_DEVICE_JOINED,
     ZIGBEE_EVENT_DEVICE_LEFT,

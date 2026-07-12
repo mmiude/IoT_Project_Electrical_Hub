@@ -93,7 +93,9 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: { 
         const ezb_zdo_signal_leave_indication_params_t *leave_ind_params = ezb_app_signal_get_params(app_signal);
         ESP_LOGI(TAG, "Zigbee Node(0x%04hx) is leaving network", leave_ind_params->short_addr); 
-        // TODO: send short address to coordinator so it knows which device is leaving
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .short_address = leave_ind_params->short_addr};   
+        ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+        xQueueSend(event_queue, &event, 0); 
     } break;
     case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { // TODO: how can we open network once requested? 
         uint8_t duration = *(uint8_t *)ezb_app_signal_get_params(app_signal);
@@ -126,9 +128,10 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     if (response->attr_id == EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) 
     {
         bool is_on = *(bool *)response->attr_value;
-        //smartPlug.is_on = is_on; 
         ESP_LOGI(TAG, "Plug ep(%d) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
-        // TODO: send info to coordinator via queue
+        zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .short_address = header->src_addr.u.short_addr, .data.is_on = is_on ? true : false};   
+        ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+        xQueueSend(event_queue, &event, 0);
     }
     else
     {
@@ -154,52 +157,88 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
             
             switch (response->attr_id)
             {
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID:
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID: {
                     int16_t power = *(int16_t *) response->attr_value;
                     ESP_LOGW(TAG, "Electrical active power: status: %d, type: %d, value: %d", response->status, response->attr_type, power);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_power = power};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.active_power = power / (float)smartPlug.power_divisor * smartPlug.power_multiplier;
                     //TODO: send raw value to coordinator via queue
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_ID: {
                     uint16_t voltage = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical rms voltage: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.voltage = voltage / (float)smartPlug.voltage_divisor * smartPlug.voltage_multiplier;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_ID: {
                     uint16_t current = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical rms current: status: %d, type: %d, value: %d, divisor: ??", response->status, response->attr_type, current);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_current = current};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.current = current / (float)smartPlug.current_divisor * smartPlug.current_multiplier;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID: {
                     uint16_t power_multi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac power multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, power_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_power = power_multi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.power_multiplier = power_multi;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_DIVISOR_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_DIVISOR_ID: {
                     uint16_t power_divi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac power divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, power_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_power = power_divi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.power_divisor = power_divi;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_DIVISOR_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_DIVISOR_ID: {
                     uint16_t voltage_divi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac voltage divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage_divi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.voltage_divisor = voltage_divi;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID: {
                     uint16_t voltage_multi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac voltage multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage_multi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.voltage_multiplier = voltage_multi; 
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID: {
                     uint16_t current_multi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac current multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, current_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_current = current_multi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.current_multiplier = current_multi;
                     break;
-                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_DIVISOR_ID:
+                    }
+                case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_DIVISOR_ID: {
                     uint16_t current_divi = *(uint16_t *) response->attr_value; 
                     ESP_LOGW(TAG, "Electrical ac current divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, current_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_current = current_divi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.current_divisor = current_divi;
                     break;
+                    }
                 default:
                     ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (electrical).");
                     break;
@@ -210,21 +249,33 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
 
             switch (response->attr_id)
             {
-                case EZB_ZCL_ATTR_METERING_CURRENT_SUMMATION_DELIVERED_ID:
+                case EZB_ZCL_ATTR_METERING_CURRENT_SUMMATION_DELIVERED_ID: {
                     uint64_t summation = *(uint64_t *) response->attr_value;
                     ESP_LOGW(TAG, "Metering current summation: status: %d, type: %d, value: %d", response->status, response->attr_type, summation);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_summation = summation};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.summation_kwh = summation / (float)smartPlug.metering_divisor * smartPlug.metering_multiplier;
                     break;
-                case EZB_ZCL_ATTR_METERING_MULTIPLIER_ID:
+                    }
+                case EZB_ZCL_ATTR_METERING_MULTIPLIER_ID: {
                     uint32_t metering_multi = *(uint32_t *) response->attr_value;
                     ESP_LOGW(TAG, "Metering multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_summation = metering_multi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.metering_multiplier = metering_multi;
-                    break;              
-                case EZB_ZCL_ATTR_METERING_DIVISOR_ID:
+                    break;   
+                    }           
+                case EZB_ZCL_ATTR_METERING_DIVISOR_ID: {
                     uint32_t metering_divi = *(uint32_t *) response->attr_value;
                     ESP_LOGW(TAG, "Metering divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_summation = metering_divi};   
+                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    xQueueSend(event_queue, &event, 0);
                     //smartPlug.metering_divisor = metering_divi;
                     break;
+                    }
                 default:
                     ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (metering).");
                     break;
