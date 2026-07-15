@@ -37,6 +37,11 @@ void ZigbeeCoordinator::run(){
             } 
             else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) {
                 ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
+                if (devices.contains(event.short_address)) {
+                    devices.erase(event.short_address); 
+                    ESP_LOGI(TAG, "smart plug deleted from devices.");
+                }
+                else ESP_LOGW(TAG, "unkonwn devices left");
             }
             else if (event.type == ZIGBEE_EVENT_ONOFF_REPORT) {
                 ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", event.short_address, event.data.is_on ? "ON" : "OFF");
