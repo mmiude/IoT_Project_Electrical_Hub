@@ -53,6 +53,14 @@ typedef enum {
     ZIGBEE_EVENT_VOLTAGE_REPORT,
     ZIGBEE_EVENT_CURRENT_REPORT,
     ZIGBEE_EVENT_SUMMATION_REPORT,
+    ZIGBEE_EVENT_POWER_MULTIPLIER,
+    ZIGBEE_EVENT_POWER_DIVISOR,
+    ZIGBEE_EVENT_VOLTAGE_MULTIPLIER,
+    ZIGBEE_EVENT_VOLTAGE_DIVISOR,
+    ZIGBEE_EVENT_CURRENT_MULTIPLIER,
+    ZIGBEE_EVENT_CURRENT_DIVISOR,
+    ZIGBEE_EVENT_SUMMATION_MULTIPLIER,
+    ZIGBEE_EVENT_SUMMATION_DIVISOR,
 } zigbee_event_type;
 
 typedef struct {
@@ -67,6 +75,14 @@ typedef struct {
         uint16_t raw_voltage;
         uint16_t raw_current;
         uint64_t raw_summation;
+        uint16_t power_multiplier;
+        uint16_t power_divisor;
+        uint16_t voltage_multiplier;
+        uint16_t volgate_divisor; 
+        uint16_t current_multiplier;
+        uint16_t current_divisor; 
+        uint32_t summation_multiplier; 
+        uint32_t summation_divisor; 
     } data;
 
 } zigbee_event;
