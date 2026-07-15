@@ -28,12 +28,17 @@ void ZigbeeCoordinator::run(){
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
             if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) {
-                devices[event.short_address].short_addr = event.short_address;
-                binding_short_addr = event.short_address; 
-                ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
-                esp_zigbee_lock_acquire(portMAX_DELAY);
-                zdo_find_smart_plug_device(event.short_address);
-                esp_zigbee_lock_release();
+                if (devices.contains(event.short_address)){
+                    ESP_LOGI(TAG, "smart plug rejoined: 0x%04hx", event.short_address);
+                }
+                else {
+                    ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
+                    binding_short_addr = event.short_address; 
+                    devices[event.short_address].short_addr = event.short_address;
+                    esp_zigbee_lock_acquire(portMAX_DELAY);
+                    zdo_find_smart_plug_device(event.short_address);
+                    esp_zigbee_lock_release();
+                }
             } 
             else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) {
                 ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
@@ -81,6 +86,12 @@ void ZigbeeCoordinator::electrical_values(){
     }
 }
 
+int ZigbeeCoordinator::check_device_count(){
+    for (const auto& [key, value] : devices) {
+        printf("Device: 0x%04hx\n", key); 
+    }
+    return devices.size(); 
+}
 
 // private methods 
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){

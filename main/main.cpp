@@ -6,13 +6,17 @@
 #include "zigbee_gateway.h"
 #include "ZigbeeCoordinator.h"
 
+static const char *TAG = "MAIN"; 
+
 void dummy_task(void *params) {
     static ZigbeeCoordinator coordinator;
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
         coordinator.electrical_values(); 
-        coordinator.energy_consumption(); 
+        coordinator.energy_consumption();
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGI(TAG, "DEVICE COUNT: %d", coordinator.check_device_count()); 
     }
 }
 

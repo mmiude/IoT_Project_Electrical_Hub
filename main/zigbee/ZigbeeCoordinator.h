@@ -13,6 +13,7 @@ public:
     //virtual function definitons 
     void energy_consumption();
     void electrical_values();
+    int check_device_count();
 
 private: 
     static void runner(void *params);
