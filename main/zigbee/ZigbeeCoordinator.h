@@ -11,10 +11,10 @@ class ZigbeeCoordinator {
 public:
     ZigbeeCoordinator();
     //virtual function definitons 
-    void get_energy_consumption();
-    void get_electrical_values();
+    void get_energy_consumption(uint16_t short_addr);
+    void get_electrical_values(uint16_t short_addr);
     int check_device_count();
-    // on/off command 
+    void toggle_smart_plug(uint16_t short_addr); 
 
 private: 
     static void runner(void *params);

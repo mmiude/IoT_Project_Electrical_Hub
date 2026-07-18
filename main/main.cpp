@@ -13,8 +13,8 @@ void dummy_task(void *params) {
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(10000));
-        coordinator.get_electrical_values(); 
-        coordinator.get_energy_consumption();
+        coordinator.get_electrical_values(1); 
+        coordinator.get_energy_consumption(1);
         vTaskDelay(pdMS_TO_TICKS(5000));
         ESP_LOGI(TAG, "DEVICE COUNT: %d", coordinator.check_device_count()); 
     }

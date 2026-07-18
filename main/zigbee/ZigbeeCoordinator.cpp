@@ -23,74 +23,130 @@ void ZigbeeCoordinator::run(){
     ESP_LOGI(TAG, "Starting the coordinator task");
     if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
     ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
-    zigbee_event event; 
+    zigbee_event event;
 
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
+            // first check if we are handling known smart plug -> we get pointer to it so we don't need to look it up from the std::map many times
+            auto it = devices.find(event.short_address);
+            smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
+
             if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) {
-                if (devices.contains(event.short_address)){
+                if (plug){
                     ESP_LOGI(TAG, "smart plug rejoined: 0x%04hx", event.short_address);
                 }
                 else {
                     ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
                     binding_short_addr = event.short_address; 
-                    devices[event.short_address].short_addr = event.short_address;
+                    
                     esp_zigbee_lock_acquire(portMAX_DELAY);
-                    zdo_find_smart_plug_device(event.short_address);
+                    if (zdo_find_smart_plug_device(event.short_address) == ESP_OK) devices[event.short_address].short_addr = event.short_address;
+                    else {
+                        vTaskDelay(pdMS_TO_TICKS(500)); //if first try fails we take a breather and try again. not the prettiest solution here... 
+                        if (zdo_find_smart_plug_device(event.short_address) == ESP_OK) devices[event.short_address].short_addr = event.short_address;
+                        else ESP_LOGE(TAG, "failed to find smart plug. Pls reset the plug to factory settings and try again. No devices added to coordinator");
+                    }
                     esp_zigbee_lock_release();
+                    //plug = &devices[event.short_address]; 
                 }
             } 
             else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) {
                 ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
-                if (devices.contains(event.short_address)) {
+                if (plug) {
                     devices.erase(event.short_address); 
                     ESP_LOGI(TAG, "smart plug deleted from devices.");
+                    plug = nullptr; // so we don't end up with dangling pointer 
                 }
                 else ESP_LOGW(TAG, "unkonwn devices left");
             }
             else if (event.type == ZIGBEE_EVENT_ONOFF_REPORT) {
-                ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", event.short_address, event.data.is_on ? "ON" : "OFF");
+                if (plug) {
+                    plug->is_on = event.data.is_on ? "ON" : "OFF";
+                    ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", event.short_address, event.data.is_on ? "ON" : "OFF");
+                }
+                else ESP_LOGW(TAG, "on/off report from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_POWER_REPORT) {
-                //TODO add check that the device exists on the map -> otherwise might add ghost devices. maybe use reference auto& plug = devices[event.short_address] (otherwise power goes waist while always looking up the instances from the map)
-                devices[event.short_address].active_power = (float)event.data.raw_power * devices[event.short_address].power_multiplier / devices[event.short_address].power_divisor; 
-                ESP_LOGI(TAG, "smart plug: 0x%04hx power: %.2f", event.short_address, devices[event.short_address].active_power);
+                if (plug) {
+                    plug->active_power = (float)event.data.raw_power * plug->power_multiplier / plug->power_divisor;
+                    ESP_LOGI(TAG, "smart plug: 0x%04hx power: %.2f", event.short_address, plug->active_power);
+                }
+                else ESP_LOGW(TAG, "power report from unkown smart plug");
+                //devices[event.short_address].active_power = (float)event.data.raw_power * devices[event.short_address].power_multiplier / devices[event.short_address].power_divisor; 
+                //ESP_LOGI(TAG, "smart plug: 0x%04hx power: %.2f", event.short_address, devices[event.short_address].active_power);
             }
             else if (event.type == ZIGBEE_EVENT_VOLTAGE_REPORT) {
-                devices[event.short_address].voltage = (float)event.data.raw_voltage * devices[event.short_address].voltage_multiplier / devices[event.short_address].voltage_divisor;
-                ESP_LOGI(TAG, "smart plug: 0x%04hx voltage: %.2f", event.short_address, devices[event.short_address].voltage );
+                if (plug) {
+                    plug->voltage = (float)event.data.raw_voltage * plug->voltage_multiplier / plug->voltage_divisor;
+                    ESP_LOGI(TAG, "smart plug: 0x%04hx voltage: %.2f", event.short_address, plug->voltage);
+                }
+                else ESP_LOGW(TAG, "voltage report from unkown smart plug");
+                //devices[event.short_address].voltage = (float)event.data.raw_voltage * devices[event.short_address].voltage_multiplier / devices[event.short_address].voltage_divisor;
+                //ESP_LOGI(TAG, "smart plug: 0x%04hx voltage: %.2f", event.short_address, devices[event.short_address].voltage );
             }
             else if (event.type == ZIGBEE_EVENT_CURRENT_REPORT) {
-                devices[event.short_address].current = (float)event.data.raw_current * devices[event.short_address].current_multiplier / devices[event.short_address].current_divisor;
-                ESP_LOGI(TAG, "smart plug: 0x%04hx current: %.2f", event.short_address, devices[event.short_address].current);
+                if (plug) {
+                    plug->current = (float)event.data.raw_current * plug->current_multiplier / plug->current_divisor;
+                    ESP_LOGI(TAG, "smart plug: 0x%04hx current: %.4f", event.short_address, plug->current); 
+                }
+                else ESP_LOGW(TAG, "current report from unkown smart plug"); 
+                //devices[event.short_address].current = (float)event.data.raw_current * devices[event.short_address].current_multiplier / devices[event.short_address].current_divisor;
+                //ESP_LOGI(TAG, "smart plug: 0x%04hx current: %.2f", event.short_address, devices[event.short_address].current);
             }
             else if (event.type == ZIGBEE_EVENT_SUMMATION_REPORT) {
-                devices[event.short_address].summation_kwh = (float)event.data.raw_summation * devices[event.short_address].summation_multiplier / devices[event.short_address].summation_divisor;
-                ESP_LOGI(TAG, "smart plug: 0x%04hx summation: %.2f", event.short_address, devices[event.short_address].summation_kwh );
+                if (plug) {
+                    plug->summation_kwh = (float)event.data.raw_summation * plug->summation_multiplier / plug->summation_divisor;
+                    ESP_LOGI(TAG, "smart plug: 0x%04hx summation: %.2f", event.short_address, plug->summation_kwh);
+                }
+                else ESP_LOGW(TAG, "summation report from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_POWER_MULTIPLIER) {
-                devices[event.short_address].power_multiplier = event.data.power_multiplier;
+                if (plug) {
+                    plug->power_multiplier = event.data.power_multiplier;
+                }
+                else ESP_LOGW(TAG, "power multiplier from unkown smart plug"); 
             }
             else if (event.type == ZIGBEE_EVENT_POWER_DIVISOR) {
-                devices[event.short_address].power_divisor = event.data.power_divisor;
+                if (plug) {
+                    plug->power_divisor = event.data.power_divisor;
+                }
+                else ESP_LOGW(TAG, "power divisor from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_VOLTAGE_MULTIPLIER){
-                devices[event.short_address].voltage_multiplier = event.data.voltage_multiplier;
+                if (plug) {
+                    plug->voltage_multiplier = event.data.voltage_multiplier;
+                }
+                else ESP_LOGW(TAG, "voltage multiplier from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_VOLTAGE_DIVISOR) {
-                devices[event.short_address].voltage_divisor = event.data.volgate_divisor;
+                if (plug) {
+                    plug->voltage_divisor = event.data.volgate_divisor;
+                }
+                else ESP_LOGW(TAG, "voltage divisor from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_CURRENT_MULTIPLIER) {
-                devices[event.short_address].current_multiplier = event.data.current_multiplier;
+                if (plug) {
+                    plug->current_multiplier = event.data.current_multiplier;
+                }
+                else ESP_LOGW(TAG, "current multiplier from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_CURRENT_DIVISOR) {
-                devices[event.short_address].current_divisor = event.data.current_divisor;
+                if (plug) {
+                    plug->current_divisor = event.data.current_divisor;
+                }
+                else ESP_LOGW(TAG, "current divisor from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_SUMMATION_MULTIPLIER) {
-                devices[event.short_address].summation_multiplier = event.data.summation_multiplier;
+                if (plug) {
+                    plug->summation_multiplier = event.data.summation_multiplier;
+                }
+                else ESP_LOGW(TAG, "summation multiplier from unkown smart plug");
             }
             else if (event.type == ZIGBEE_EVENT_SUMMATION_DIVISOR) {
-                devices[event.short_address].summation_divisor = event.data.summation_divisor;
+                if (plug) {
+                    plug->summation_divisor = event.data.summation_divisor;
+                }
+                else ESP_LOGW(TAG, "summation divisor form unkown smart plug");
             }
             else ESP_LOGW(TAG, "unknown event type");
         }
@@ -99,7 +155,7 @@ void ZigbeeCoordinator::run(){
 
 // public methods. Will be used through controller interface eventually. 
 
-void ZigbeeCoordinator::get_energy_consumption(){
+void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr){
     for (const auto& [key, value] : devices) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
         read_electrical_measurement_values(key, value.endpoint); 
@@ -107,7 +163,7 @@ void ZigbeeCoordinator::get_energy_consumption(){
     }
 }
 
-void ZigbeeCoordinator::get_electrical_values(){
+void ZigbeeCoordinator::get_electrical_values(uint16_t short_addr){
     for (const auto& [key, value] : devices) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
         read_energy_consumption_value(key, value.endpoint); 
@@ -122,7 +178,19 @@ int ZigbeeCoordinator::check_device_count(){
     return devices.size(); 
 }
 
+void ZigbeeCoordinator::toggle_smart_plug(uint16_t short_addr){
+    auto &plug = devices[short_addr];
+    if (devices.contains(short_addr)) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_toggle_smart_plug(short_addr, plug.endpoint);
+        esp_zigbee_lock_release(); 
+    }
+    else ESP_LOGW(TAG, "Trying to toggle unkown smart plug");
+}
+
 // private methods 
+
+
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){
     uint16_t metering_attrs[] = {
         EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID,
