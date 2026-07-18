@@ -44,7 +44,6 @@
         .platform_config = ESP_ZIGBEE_PLATFORM_CONFIG(), \
     };
 
-
 typedef enum {
     ZIGBEE_EVENT_DEVICE_JOINED,
     ZIGBEE_EVENT_DEVICE_LEFT,
@@ -61,6 +60,7 @@ typedef enum {
     ZIGBEE_EVENT_CURRENT_DIVISOR,
     ZIGBEE_EVENT_SUMMATION_MULTIPLIER,
     ZIGBEE_EVENT_SUMMATION_DIVISOR,
+    ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR,
 } zigbee_event_type;
 
 typedef struct {
@@ -83,6 +83,7 @@ typedef struct {
         uint16_t current_divisor; 
         uint32_t summation_multiplier; 
         uint32_t summation_divisor; 
+        uint16_t unsupported_attr; 
     } data;
 
 } zigbee_event;

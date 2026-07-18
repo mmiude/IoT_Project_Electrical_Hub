@@ -147,7 +147,11 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
 
     ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(%d)", header->src_ep, header->src_addr.u.short_addr);
     // TODO: here we need to somehow set metering -> false if not supported and if electrical is not supported we don't add that plug at all. 
-    if (response->status != 0) ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(%d)", response->attr_id, header->src_addr.u.short_addr);
+    if (response->status != 0) {
+        ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(%d)", response->attr_id, header->src_addr.u.short_addr);
+        zigbee_event event = {.type = ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR, .short_address = header->src_addr.u.short_addr, .data.unsupported_attr = response->attr_id};
+        xQueueSend(event_queue, &event, 0);
+    } 
 
     while (response != NULL && response->status == 0) {
         
