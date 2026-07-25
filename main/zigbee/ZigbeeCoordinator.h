@@ -25,7 +25,7 @@ private:
 
     //device map/vector/something to keep track of smart plugs
     std::map<uint16_t, smartPlug> devices;
-    uint16_t binding_short_addr; // temporary solutions... ugly... would be great to get rid of some point...
+    //uint16_t binding_short_addr; // temporary solutions... ugly... would be great to get rid of some point...
 
     //commands to smart plugs 
     ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep);

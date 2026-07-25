@@ -23,7 +23,6 @@ QueueHandle_t zigbee_gateway_get_queue()
     return event_queue;
 }
 
- 
 static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg) 
 {
     //mandatory to acquire the lock before calling any Zigbee SDK APIs
@@ -31,6 +30,122 @@ static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg)
     (void)ezb_bdb_start_top_level_commissioning(arg);
     esp_zigbee_lock_release();
 }
+
+//binding methods -> bind each smart plug into the network (for reporting purposes)
+
+static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, void *user_ctx)
+{
+    uint16_t short_addr = (uint16_t)(uintptr_t) user_ctx; 
+
+    assert(result);
+    if (result->error == EZB_ERR_NONE) {
+        if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
+            ESP_LOGI(TAG, "Bound smart plug device successfully");
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .short_address = short_addr};
+            xQueueSend(event_queue, &event, 0);
+            //send binding successfull signal 
+            //ESP_LOGW(TAG, "SHORT ADDRESS: %d", (uint16_t) user_ctx);
+            //send_configure_reporting(smart_plugs[smart_index], 1);
+            //esp_zigbee_lock_acquire(portMAX_DELAY);
+            //send_configure_reporting(smartPlug.short_address, smartPlug.endpoint);
+            //read_electrical_measurement_multipliers(smartPlug.short_address, smartPlug.endpoint);
+            //read_energy_consumption_multipliers(smartPlug.short_address, smartPlug.endpoint);
+            //esp_zigbee_lock_release(); 
+
+        } else {
+            ESP_LOGE(TAG, "Failed to bind smart plug device with status (0x%02x)", result->rsp->status);
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = short_addr};
+            xQueueSend(event_queue, &event, 0);
+            // send binding error signal
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to bind smart plug device with error (0x%04x)", result->error);
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = short_addr};
+        xQueueSend(event_queue, &event, 0);
+        //send binding error signal
+    }
+}
+
+static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst_ep)
+{
+    ezb_err_t          ret      = EZB_ERR_FAIL;
+    ESP_LOGW(TAG, "plug short address: %d", dst_short_addr);
+
+    ezb_zdo_bind_req_t bind_req = {
+        .dst_nwk_addr = dst_short_addr,
+        .field =
+            {
+                .src_ep        = dst_ep, 
+                .cluster_id    = EZB_ZCL_CLUSTER_ID_ON_OFF,
+                .dst_addr_mode = EZB_ADDR_MODE_EXT,
+                .dst_ep        = ESP_ZIGBEE_CUSTOM_GATEWAY_EP_ID,
+            },
+        .cb       = zdo_bind_smart_plug_result,
+        .user_ctx = (void *)(uintptr_t) dst_short_addr, //(void*) dst_short_addr,
+    };
+    ezb_address_extended_by_short(dst_short_addr, &bind_req.field.src_addr);
+    ezb_nwk_get_extended_address(&bind_req.field.dst_addr.extended_addr);
+
+    ret = ezb_zdo_bind_req(&bind_req);
+
+    if (ret == EZB_ERR_NONE) {
+        ESP_LOGI(TAG, "Attempt to bind smart plug device (short address: 0x%04hx)", dst_short_addr);
+    } else {
+        ESP_LOGE(TAG, "Failed to bind smart plug device (short address: 0x%04hx) with error(0x%04x)", dst_short_addr, ret);
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = dst_short_addr};
+        xQueueSend(event_queue, &event, 0);
+    }
+    return ret;
+}
+
+static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx)
+{
+    assert(result);
+    if (result->error == EZB_ERR_NONE) {
+        if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS && result->rsp->match_length > 0 &&
+            result->rsp->match_list) {
+            for (size_t i = 0; i < result->rsp->match_length; i++) {
+                ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
+                zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = result->rsp->nwk_addr_of_interest, .data.end_point = result->rsp->match_list[i]};
+                xQueueSend(event_queue, &event, 0);  
+                zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
+            }
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to find smart plug device in the network with error(0x%04x)", result->error);
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = (uint16_t)(uintptr_t) user_ctx};
+        xQueueSend(event_queue, &event, 0);
+    }
+}
+
+static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
+{   
+    ezb_err_t ret             = EZB_ERR_FAIL;
+    uint16_t  cluster_list[] = {EZB_ZCL_CLUSTER_ID_ON_OFF};
+
+    ezb_zdo_match_desc_req_t req = {
+        .dst_nwk_addr = dst_addr,
+        .field =
+            {
+                .nwk_addr_of_interest = dst_addr,
+                .profile_id           = EZB_AF_HA_PROFILE_ID,
+                .num_in_clusters      = sizeof(cluster_list) / sizeof(cluster_list[0]),
+                .num_out_clusters     = 0,
+                .cluster_list         = cluster_list,
+            },
+        .cb       = zdo_find_smart_plug_device_result,
+        .user_ctx = (void *)(uintptr_t) dst_addr,
+    };
+    ret = ezb_zdo_match_desc_req(&req);
+    if (ret == EZB_ERR_NONE) {
+        ESP_LOGI(TAG, "Attempt to find smart_plug device");
+    } else {
+        ESP_LOGE(TAG, "Failed to find smart_plug device with error(0x%04x)", ret);
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = dst_addr};
+        xQueueSend(event_queue, &event, 0);
+    }
+    return ret;
+} 
 
 static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) 
 {   
@@ -83,9 +198,10 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     case EZB_ZDO_SIGNAL_DEVICE_ANNCE: {
         const ezb_zdo_signal_device_annce_params_t *dev_annce_params = ezb_app_signal_get_params(app_signal);
         ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->short_addr);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = dev_annce_params->short_addr};   
-        ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
-        xQueueSend(event_queue, &event, 0); 
+        zdo_find_smart_plug_device(dev_annce_params->short_addr);
+        //zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = dev_annce_params->short_addr};   
+        //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+        //xQueueSend(event_queue, &event, 0); 
         //zdo_find_smart_plug_device(dev_annce_params->short_addr); binding will happen on coordinator side
         //smart_plugs = dev_annce_params->short_addr; // TODO: send short address to coordinator -> binds and sends configuration
         //send_configure_reporting(dev_annce_params->short_addr, 1);
@@ -119,7 +235,7 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     ezb_zcl_report_attr_variable_t *response = message->in.variables; 
     const ezb_zcl_cmd_hdr_t *header = message->in.header; 
 
-    ESP_LOGI(TAG, "Attr report from smart plug(%d) addr(%d) attr(0x%04x) data type(0x%04x)",
+    ESP_LOGI(TAG, "Attr report from smart plug(%d) addr(0x%04hx) attr(0x%04x) data type(0x%04x)",
         header->src_ep,
         header->src_addr,
         response->attr_id,
@@ -128,9 +244,9 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     if (response->attr_id == EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) 
     {
         bool is_on = *(bool *)response->attr_value;
-        ESP_LOGI(TAG, "Plug ep(%d) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
+        ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
         zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .short_address = header->src_addr.u.short_addr, .data.is_on = is_on ? true : false};   
-        ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+        ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0);
     }
     else
@@ -145,10 +261,10 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
     ezb_zcl_read_attr_rsp_variable_t *response = message->in.variables;
     const ezb_zcl_cmd_hdr_t *header = message->in.header;
 
-    ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(%d)", header->src_ep, header->src_addr.u.short_addr);
+    ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(0x%04hx)", header->src_ep, header->src_addr.u.short_addr);
     // TODO: here we need to somehow set metering -> false if not supported and if electrical is not supported we don't add that plug at all. 
     if (response->status != 0) {
-        ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(%d)", response->attr_id, header->src_addr.u.short_addr);
+        ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(0x%04hx)", response->attr_id, header->src_addr.u.short_addr);
         zigbee_event event = {.type = ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR, .short_address = header->src_addr.u.short_addr, .data.unsupported_attr = response->attr_id};
         xQueueSend(event_queue, &event, 0);
     } 
@@ -276,7 +392,7 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
     ezb_zcl_cmd_config_report_rsp_message_t *response = (ezb_zcl_cmd_config_report_rsp_message_t *)message;
     const ezb_zcl_cmd_hdr_t *header = response->in.header;
 
-    ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(%d)", response->info.cluster_id, header->src_addr.u.short_addr);
+    ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(0x%04hx)", response->info.cluster_id, header->src_addr.u.short_addr);
 
     ezb_zcl_config_report_rsp_variable_t *response_variable = response->in.variables;
     while (response_variable != NULL) {
@@ -309,7 +425,7 @@ static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t
         case EZB_ZCL_CORE_DEFAULT_RSP_CB_ID:    
             ezb_zcl_cmd_default_rsp_message_t *response = (ezb_zcl_cmd_default_rsp_message_t *)message;
             const ezb_zcl_cmd_hdr_t *header = response->in.header;
-            ESP_LOGI(TAG, "Command response from ep(%d) smart plug(%d): status(0x%02x) %s",
+            ESP_LOGI(TAG, "Command response from ep(%d) smart plug(0x%04hx): status(0x%02x) %s",
                  response->info.dst_ep,
                  header->src_addr.u.short_addr,
                  response->info.status,

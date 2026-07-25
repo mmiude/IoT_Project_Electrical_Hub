@@ -9,19 +9,19 @@ typedef struct smartPlugInfo {
     bool supports_metering = false;
     bool supports_electrical_measurement = false; 
 
-    uint16_t current_divisor;
-    uint16_t current_multiplier;
-    uint16_t voltage_divisor;
-    uint16_t voltage_multiplier;
-    uint16_t power_divisor;
-    uint16_t power_multiplier;
-    uint32_t summation_divisor;
-    uint32_t summation_multiplier;
+    uint16_t current_divisor{};
+    uint16_t current_multiplier{};
+    uint16_t voltage_divisor{};
+    uint16_t voltage_multiplier{};
+    uint16_t power_divisor{};
+    uint16_t power_multiplier{};
+    uint32_t summation_divisor{};
+    uint32_t summation_multiplier{};
 
-    float active_power;
-    float voltage; 
-    float current;
-    float summation_kwh; 
+    float active_power{};
+    float voltage{}; 
+    float current{};
+    float summation_kwh{}; 
     
 } smartPlug;
 

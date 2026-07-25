@@ -35,14 +35,31 @@ void ZigbeeCoordinator::run(){
                     ESP_LOGI(TAG, "smart plug rejoined: 0x%04hx", event.short_address);
                 }
                 else {
-                    ESP_LOGI(TAG, "new smart plug joined: 0x%04hx", event.short_address);
-                    binding_short_addr = event.short_address;                    
-                    esp_zigbee_lock_acquire(portMAX_DELAY);
-                    if (zdo_find_smart_plug_device(event.short_address) == ESP_OK) devices[event.short_address].short_addr = event.short_address;
-                    else ESP_LOGE(TAG, "Error while trying to find the smart plug. Please reset the plug and try again."); 
-                    esp_zigbee_lock_release();
+                    auto [it, inserted] = devices.emplace(event.short_address, smartPlug{
+                        .short_addr = event.short_address,
+                        .endpoint = event.data.end_point
+                    });
+                    if (inserted){
+                        ESP_LOGI(TAG, "new smart plug joined: add: 0x%04hx endpoint: %d", event.short_address, event.data.end_point);
+                        esp_zigbee_lock_acquire(portMAX_DELAY);
+                        send_configure_reporting(it->second.short_addr, it->second.endpoint);
+                        read_electrical_measurement_multipliers(it->second.short_addr, it->second.endpoint);
+                        read_energy_consumption_multipliers(it->second.short_addr, it->second.endpoint);
+                        esp_zigbee_lock_release();
+                    }
+                    else ESP_LOGW(TAG, "new plug not added to devices map. we shouldn't be here ever.");
                 }
+            }
+            else if (event.type == ZIGBEE_EVENT_DEVICE_NOT_FOUND) {
+                ESP_LOGE(TAG, "Smart plug not found. Let the user know only smart plugs are accepted"); 
+                // HERE WE NEED TO CHECK IF IT'S ALREADY KNOWN DEVICE THAT IS REJOINING... once devices are saved over power losses we can make this work 
+            }
+            else if (event.type == ZIGBEE_EVENT_BINDING_SUCCESSFUL) {
+                ESP_LOGI(TAG, "binding successful for plug: 0x%04hx", event.short_address);
             } 
+            else if (event.type == ZIGBEE_EVENT_BINDING_ERROR) {
+                ESP_LOGE(TAG, "binding error with plug: 0x%04hx", event.short_address); 
+            }
             else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) {
                 ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
                 if (plug) {
@@ -452,9 +469,7 @@ esp_err_t ZigbeeCoordinator::send_configure_reporting(uint16_t dst_addr, uint8_t
 }
 
     //binding methods 
-ezb_err_t ZigbeeCoordinator::zdo_find_smart_plug_device(uint16_t dst_addr){
-    //smartPlug.short_address = dst_addr;
-
+/*ezb_err_t ZigbeeCoordinator::zdo_find_smart_plug_device(uint16_t dst_addr){
     ezb_err_t ret             = EZB_ERR_FAIL;
     uint16_t  cluster_list[] = {EZB_ZCL_CLUSTER_ID_ON_OFF};
 
@@ -487,7 +502,6 @@ void ZigbeeCoordinator::zdo_find_smart_plug_device_result(const ezb_zdo_match_de
             result->rsp->match_list) {
             for (size_t i = 0; i < result->rsp->match_length; i++) {
                 ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
-                //smartPlug.endpoint = result->rsp->match_list[i];
                 static_cast<ZigbeeCoordinator*>(user_ctx)->devices[result->rsp->nwk_addr_of_interest].endpoint = result->rsp->match_list[i];
                 static_cast<ZigbeeCoordinator*>(user_ctx)->zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
             }
@@ -499,8 +513,6 @@ void ZigbeeCoordinator::zdo_find_smart_plug_device_result(const ezb_zdo_match_de
 
 ezb_err_t ZigbeeCoordinator::zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst_ep){
     ezb_err_t          ret      = EZB_ERR_FAIL;
-    //ESP_LOGW(TAG, "plug short address: %d", dst_short_addr);
-
     ezb_zdo_bind_req_t bind_req = {
         .dst_nwk_addr = dst_short_addr,
         .field =
@@ -515,12 +527,6 @@ ezb_err_t ZigbeeCoordinator::zdo_bind_smart_plug_device(uint16_t dst_short_addr,
     };
     ezb_address_extended_by_short(dst_short_addr, &bind_req.field.src_addr);
     ezb_nwk_get_extended_address(&bind_req.field.dst_addr.extended_addr);
-
-    //ESP_RETURN_ON_ERROR(ezb_address_extended_by_short(dst_short_addr, &bind_req.field.dst_addr.extended_addr), TAG,
-                        //"Failed to get extended address for destination device(0x%04hx)", dst_short_addr);
-    //ret = ezb_zdo_bind_req(&bind_req);
-    //bind_req.field.cluster_id = EZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT;
-    //ret = ezb_zdo_bind_req(&bind_req)
 
     ret = ezb_zdo_bind_req(&bind_req);
 
@@ -540,7 +546,6 @@ void ZigbeeCoordinator::zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
-            //ESP_LOGW(TAG, "SHORT ADDRESS: %d", (uint16_t) user_ctx);
             esp_zigbee_lock_acquire(portMAX_DELAY);
             instance->send_configure_reporting(instance->devices[short_address].short_addr, instance->devices[short_address].endpoint);
             instance->read_electrical_measurement_multipliers(instance->devices[short_address].short_addr, instance->devices[short_address].endpoint);
@@ -553,4 +558,4 @@ void ZigbeeCoordinator::zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device with error (0x%04x)", result->error);
     }
-}
+}*/
