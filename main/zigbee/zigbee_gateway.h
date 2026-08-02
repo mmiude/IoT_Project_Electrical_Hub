@@ -69,10 +69,9 @@ typedef enum {
 typedef struct {
     zigbee_event_type type;
     uint16_t short_address;
-
+    
     union zigbee_gateway
     {
-        uint8_t end_point;
         bool is_on;
         int16_t raw_power;
         uint16_t raw_voltage;
@@ -87,6 +86,10 @@ typedef struct {
         uint32_t summation_multiplier; 
         uint32_t summation_divisor; 
         uint16_t unsupported_attr; 
+        struct {
+            uint64_t ieee_address;
+            uint8_t endpoint;
+        } device_joining; 
     } data;
 
 } zigbee_event;

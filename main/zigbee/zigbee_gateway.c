@@ -31,36 +31,35 @@ static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg)
     esp_zigbee_lock_release();
 }
 
+static uint64_t get_ieee_address(uint16_t short_addr) 
+{
+    ezb_extaddr_t ieee_addr;
+    uint64_t extended_addr;
+    ezb_address_extended_by_short(short_addr, &ieee_addr);
+    memcpy(&extended_addr, &ieee_addr, sizeof(uint64_t));
+    return extended_addr;
+}
 //binding methods -> bind each smart plug into the network (for reporting purposes)
 
 static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, void *user_ctx)
 {
-    uint16_t short_addr = (uint16_t)(uintptr_t) user_ctx; 
+    uint64_t ieee_addr = get_ieee_address((uint16_t)(uintptr_t) user_ctx);
 
     assert(result);
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .short_address = short_addr};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
             xQueueSend(event_queue, &event, 0);
-            //send binding successfull signal 
-            //ESP_LOGW(TAG, "SHORT ADDRESS: %d", (uint16_t) user_ctx);
-            //send_configure_reporting(smart_plugs[smart_index], 1);
-            //esp_zigbee_lock_acquire(portMAX_DELAY);
-            //send_configure_reporting(smartPlug.short_address, smartPlug.endpoint);
-            //read_electrical_measurement_multipliers(smartPlug.short_address, smartPlug.endpoint);
-            //read_energy_consumption_multipliers(smartPlug.short_address, smartPlug.endpoint);
-            //esp_zigbee_lock_release(); 
-
         } else {
             ESP_LOGE(TAG, "Failed to bind smart plug device with status (0x%02x)", result->rsp->status);
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = short_addr};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
             xQueueSend(event_queue, &event, 0);
             // send binding error signal
         }
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device with error (0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = short_addr};
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
         xQueueSend(event_queue, &event, 0);
         //send binding error signal
     }
@@ -69,13 +68,12 @@ static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, 
 static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst_ep)
 {
     ezb_err_t          ret      = EZB_ERR_FAIL;
-    ESP_LOGW(TAG, "plug short address: %d", dst_short_addr);
 
     ezb_zdo_bind_req_t bind_req = {
         .dst_nwk_addr = dst_short_addr,
         .field =
             {
-                .src_ep        = dst_ep, 
+                .src_ep        = dst_ep,
                 .cluster_id    = EZB_ZCL_CLUSTER_ID_ON_OFF,
                 .dst_addr_mode = EZB_ADDR_MODE_EXT,
                 .dst_ep        = ESP_ZIGBEE_CUSTOM_GATEWAY_EP_ID,
@@ -92,7 +90,7 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
         ESP_LOGI(TAG, "Attempt to bind smart plug device (short address: 0x%04hx)", dst_short_addr);
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device (short address: 0x%04hx) with error(0x%04x)", dst_short_addr, ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = dst_short_addr};
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = dst_short_addr, .data.device_joining = {.ieee_address = get_ieee_address(dst_short_addr)}}; 
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -100,20 +98,23 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
 
 static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx)
 {
+    uint64_t ieee_addr = get_ieee_address((uint16_t)(uintptr_t) user_ctx);
+    ESP_LOGE(TAG, "ieee_addr: %d", ieee_addr);
+
     assert(result);
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS && result->rsp->match_length > 0 &&
             result->rsp->match_list) {
             for (size_t i = 0; i < result->rsp->match_length; i++) {
                 ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
-                zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = result->rsp->nwk_addr_of_interest, .data.end_point = result->rsp->match_list[i]};
+                zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr, .endpoint = result->rsp->match_list[i]}};
                 xQueueSend(event_queue, &event, 0);  
                 zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
             }
         }
     } else {
         ESP_LOGE(TAG, "Failed to find smart plug device in the network with error(0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = (uint16_t)(uintptr_t) user_ctx};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
         xQueueSend(event_queue, &event, 0);
     }
 }
@@ -141,7 +142,7 @@ static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
         ESP_LOGI(TAG, "Attempt to find smart_plug device");
     } else {
         ESP_LOGE(TAG, "Failed to find smart_plug device with error(0x%04x)", ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = dst_addr};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = dst_addr, .data.device_joining = {.ieee_address = get_ieee_address(dst_addr)}};
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -199,12 +200,6 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
         const ezb_zdo_signal_device_annce_params_t *dev_annce_params = ezb_app_signal_get_params(app_signal);
         ESP_LOGI(TAG, "New device commissioned or rejoined (short: 0x%04hx)", dev_annce_params->short_addr);
         zdo_find_smart_plug_device(dev_annce_params->short_addr);
-        //zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = dev_annce_params->short_addr};   
-        //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
-        //xQueueSend(event_queue, &event, 0); 
-        //zdo_find_smart_plug_device(dev_annce_params->short_addr); binding will happen on coordinator side
-        //smart_plugs = dev_annce_params->short_addr; // TODO: send short address to coordinator -> binds and sends configuration
-        //send_configure_reporting(dev_annce_params->short_addr, 1);
     } break;
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: { 
         const ezb_zdo_signal_leave_indication_params_t *leave_ind_params = ezb_app_signal_get_params(app_signal);
