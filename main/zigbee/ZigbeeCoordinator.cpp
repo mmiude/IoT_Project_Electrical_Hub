@@ -58,15 +58,15 @@ void ZigbeeCoordinator::run(){
                     read_energy_consumption_multipliers(plug->short_addr, plug->endpoint); // part of joining?
                     esp_zigbee_lock_release();
                 }
-                else ESP_LOGW(TAG, "binding successful for plug which is not on map. (0x%04hx)", plug->short_addr);
+                else ESP_LOGW(TAG, "binding successful for plug which is not on map. (0x%016llx)", event.ieee_address);
                 break;
             case ZIGBEE_EVENT_BINDING_ERROR:
                 if (plug) {
                     ESP_LOGW(TAG, "Binding error with a plug added to maps. Please reset. (0x%04hx) (0x%016llx)", plug->short_addr, event.ieee_address); 
-                } else ESP_LOGE(TAG, "Binding error with unknown plug: 0x%04hx. Please reset the plug to factory settings and try again", plug->short_addr);
+                } else ESP_LOGE(TAG, "Binding error with unknown plug: 0x%016llx. Please reset the plug to factory settings and try again", event.ieee_address);
                 break;
             case ZIGBEE_EVENT_DEVICE_LEFT:
-                ESP_LOGI(TAG, "smart plug left: 0x%04hx", plug->short_addr);
+                ESP_LOGI(TAG, "smart plug left: 0x%016llx", event.ieee_address);
                 if (plug) {
                     devices.erase(event.ieee_address);
                 } else ESP_LOGW(TAG, "unkonwn devices left");
@@ -158,7 +158,7 @@ void ZigbeeCoordinator::run(){
                     else if (event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID) {
                         plug->supports_electrical_measurement = false; 
                     }
-                    else ESP_LOGE(TAG, "unkown unsupported attribute from smart plug: 0x%04hx", plug->short_addr); 
+                    else ESP_LOGE(TAG, "unkown unsupported attribute from smart plug: 0x%016llx", event.ieee_address); 
                 }
                 break;
             default:
@@ -171,7 +171,7 @@ void ZigbeeCoordinator::run(){
 
 // public methods. Will be used through controller interface eventually. 
 
-void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr){
+void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr, uint8_t ep){
     for (const auto& [key, value] : devices) {
         if (value.supports_electrical_measurement) {
             esp_zigbee_lock_acquire(portMAX_DELAY);
@@ -181,7 +181,7 @@ void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr){
     }
 }
 
-void ZigbeeCoordinator::get_electrical_values(uint16_t short_addr){
+void ZigbeeCoordinator::get_electrical_values(uint16_t short_addr, uint8_t ep){
     for (const auto& [key, value] : devices) {
         if (value.supports_metering) {
             esp_zigbee_lock_acquire(portMAX_DELAY);
@@ -198,10 +198,40 @@ int ZigbeeCoordinator::check_device_count(){
     return devices.size(); 
 }
 
-void ZigbeeCoordinator::toggle_smart_plug(uint16_t short_addr){
+void ZigbeeCoordinator::toggle_smart_plug(uint16_t short_addr, uint8_t ep){
     esp_zigbee_lock_acquire(portMAX_DELAY);
     send_toggle_smart_plug(short_addr, devices[short_addr].endpoint);
     esp_zigbee_lock_release();
+}
+
+void ZigbeeCoordinator::set_smart_plug_on(uint16_t short_addr, uint8_t ep){
+    for (const auto& [key, value] : devices) {
+        {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_on_smart_plug(value.short_addr, value.endpoint); 
+        esp_zigbee_lock_release();
+        }
+    }
+}
+
+void ZigbeeCoordinator::set_smart_plug_off(uint16_t short_addr, uint8_t ep){
+    for (const auto& [key, value] : devices) {
+        {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_off_smart_plug(value.short_addr, value.endpoint); 
+        esp_zigbee_lock_release();
+        }
+    }
+}
+
+void ZigbeeCoordinator::get_on_off_state(uint16_t short_addr, uint8_t ep){
+    for (const auto& [key, value] : devices) {
+        {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        read_plug_on_off_state(value.short_addr, value.endpoint); 
+        esp_zigbee_lock_release();
+        }
+    } 
 }
 
 // private methods 
@@ -412,6 +442,54 @@ esp_err_t ZigbeeCoordinator::send_toggle_smart_plug(uint16_t dst_addr, uint8_t d
     ESP_LOGI(TAG, "Toggle command result: 0x%04x", err);
     
     return err == EZB_ERR_NONE ? ESP_OK : ESP_FAIL; 
+}
+
+esp_err_t ZigbeeCoordinator::send_on_smart_plug(uint16_t dst_addr, uint8_t dst_ep){
+    ezb_zcl_on_off_cmd_t on_cmd = {
+        .cmd_ctrl = {
+            .dst_addr = {
+                .addr_mode = EZB_ADDR_MODE_SHORT,
+                .u = {
+                    .short_addr = dst_addr,
+                }
+            },
+            .dst_ep = dst_ep,
+            .src_ep = ESP_ZIGBEE_CUSTOM_GATEWAY_EP_ID,
+            .dis_default_rsp = false,
+            .cnf_ctx = {
+                .cb = 0,
+            },
+        }
+    };
+
+    ezb_err_t err = ezb_zcl_on_off_on_cmd_req(&on_cmd);
+    ESP_LOGI(TAG, "On command result: 0x%04x", err);
+    
+    return err == EZB_ERR_NONE ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t ZigbeeCoordinator::send_off_smart_plug(uint16_t dst_addr, uint8_t dst_ep){
+        ezb_zcl_on_off_cmd_t off_cmd = {
+        .cmd_ctrl = {
+            .dst_addr = {
+                .addr_mode = EZB_ADDR_MODE_SHORT,
+                .u = {
+                    .short_addr = dst_addr,
+                }
+            },
+            .dst_ep = dst_ep,
+            .src_ep = ESP_ZIGBEE_CUSTOM_GATEWAY_EP_ID,
+            .dis_default_rsp = false,
+            .cnf_ctx = {
+                .cb = 0,
+            },
+        }
+    };
+
+    ezb_err_t err = ezb_zcl_on_off_off_cmd_req(&off_cmd);
+    ESP_LOGI(TAG, "Off command result: 0x%04x", err);
+    
+    return err == EZB_ERR_NONE ? ESP_OK : ESP_FAIL;
 }
 
 esp_err_t ZigbeeCoordinator::send_configure_reporting(uint16_t dst_addr, uint8_t dst_ep){

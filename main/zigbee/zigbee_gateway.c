@@ -205,7 +205,7 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     } break;
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: { 
         const ezb_zdo_signal_leave_indication_params_t *leave_ind_params = ezb_app_signal_get_params(app_signal);
-        ESP_LOGI(TAG, "Zigbee Node(0x%04hx) (0x%016hx) is leaving network", leave_ind_params->short_addr, get_ieee_address(leave_ind_params->short_addr)); 
+        ESP_LOGI(TAG, "Zigbee Node(0x%04hx) (0x%016llx) is leaving network", leave_ind_params->short_addr, get_ieee_address(leave_ind_params->short_addr)); 
         zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .ieee_address = get_ieee_address(leave_ind_params->short_addr)};   
         ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0); 
@@ -373,6 +373,10 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
                     ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (metering).");
                     break;
             }
+            break;
+        case EZB_ZCL_CLUSTER_ID_ON_OFF:
+            bool is_on = *(bool *)response->attr_value;
+            ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s MANUALLY REQUESTED", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
             break;
         default:
             ESP_LOGE(TAG, "Unknown cluster id in attribute read response handler.");

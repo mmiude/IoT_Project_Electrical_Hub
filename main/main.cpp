@@ -12,11 +12,15 @@ void dummy_task(void *params) {
     static ZigbeeCoordinator coordinator;
 
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        coordinator.get_electrical_values(1); 
-        coordinator.get_energy_consumption(1);
+        vTaskDelay(pdMS_TO_TICKS(15000));
+        coordinator.get_electrical_values(1, 1); 
+        coordinator.get_energy_consumption(1, 1);
         vTaskDelay(pdMS_TO_TICKS(5000));
-        ESP_LOGI(TAG, "DEVICE COUNT: %d", coordinator.check_device_count()); 
+        ESP_LOGI(TAG, "DEVICE COUNT: %d", coordinator.check_device_count());
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        coordinator.set_smart_plug_on(1, 1);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        coordinator.get_on_off_state(1, 1); 
     }
 }
 
