@@ -158,9 +158,21 @@ void ZigbeeCoordinator::run(){
                     else if (event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID) {
                         plug->supports_electrical_measurement = false; 
                     }
-                    else ESP_LOGE(TAG, "unkown unsupported attribute from smart plug: 0x%016llx", event.ieee_address); 
+                    else ESP_LOGE(TAG, "unknown unsupported attribute from smart plug: 0x%016llx", event.ieee_address); 
                 }
                 break;
+            case ZIGBEE_EVENT_STATE_REPORTING_SUCCESS:
+                if (plug) {
+                    ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to true", plug->short_addr);
+                    plug->automatic_state_reporting = true;
+                } else ESP_LOGW(TAG, "unknown plug sent state reporting successful signal");
+                break;
+            case ZIGBEE_EVENT_STATE_REPORTING_ERROR:
+                if (plug) {
+                    ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to false", plug->short_addr);
+                    plug->automatic_state_reporting = false;
+                } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
+                break; 
             default:
                 ESP_LOGW(TAG, "unknown event type");
                 break;

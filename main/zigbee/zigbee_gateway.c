@@ -377,6 +377,9 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
         case EZB_ZCL_CLUSTER_ID_ON_OFF:
             bool is_on = *(bool *)response->attr_value;
             ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s MANUALLY REQUESTED", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
+            zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.is_on = is_on ? true : false};   
+            ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+            xQueueSend(event_queue, &event, 0);
             break;
         default:
             ESP_LOGE(TAG, "Unknown cluster id in attribute read response handler.");
@@ -397,10 +400,13 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
     while (response_variable != NULL) {
         if (response_variable->status == EZB_ZCL_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "  All attributes accepted (status SUCCESS)");
-            // TODO: here we could send signal that reporting is okay -> controller knows automatic on/off reporting is on... 
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_SUCCESS, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            xQueueSend(event_queue, &event, 0);
         } else {
             ESP_LOGW(TAG, "  attr(0x%04x) FAILED with status(0x%02x)",
             response_variable->attr_id, response_variable->status);
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            xQueueSend(event_queue, &event, 0);
         }
         response_variable = response_variable->next;
     }
