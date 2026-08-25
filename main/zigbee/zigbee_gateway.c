@@ -101,7 +101,7 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
 static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx)
 {
     uint64_t ieee_addr = get_ieee_address((uint16_t)(uintptr_t) user_ctx);
-    ESP_LOGE(TAG, "ieee_addr: %d", ieee_addr);
+    ESP_LOGE(TAG, "ieee_addr: 0x%016llx", ieee_addr);
 
     assert(result);
     if (result->error == EZB_ERR_NONE) {
