@@ -28,48 +28,48 @@ void ZigbeeCoordinator::run(){
 
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
-           // auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
-           // smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
-           smartPlug *plug = find_smart_plug_with_short_addr(event.short_address); // this is used for every event except joining! 
 
-            if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) { 
-                bool known_plug = check_joining_with_ieee(event.data.device_joining.ieee_address, event.short_address); // ieee gives us the absolute truth
-                if (!known_plug) {
-                    //add new device to both maps.
-                    auto [dev_it, devices_inserted] = devices.emplace(event.data.device_joining.ieee_address, smartPlug{
-                        .short_addr = event.short_address,
+           auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
+           smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
+           //smartPlug *plug = find_smart_plug_with_short_addr(event.short_address); // this is used for every event except joining! 
+
+            if (event.type == ZIGBEE_EVENT_DEVICE_JOINED) {  // TODO: should this be switch case instead? 
+                if (!plug) {
+                    auto [dev_it, devices_inserted] = devices.emplace(event.ieee_address, smartPlug{
+                        .short_addr = event.data.device_joining.short_addr,
                         .endpoint = event.data.device_joining.endpoint,
                     }); 
-                    auto [map_it, devices_map_inserted] = devices_address_map.emplace(event.short_address, event.data.device_joining.ieee_address);
-                    if (devices_inserted && devices_map_inserted) ESP_LOGI(TAG, "NEW DEVICE ADDED ON BOTH MAPS. short: 0x%04hx, ieee: 0x%04hx", event.short_address, event.data.device_joining.ieee_address);
+                    if (devices_inserted) ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
+                    // check multipliers here...? 
                 }
+                else ESP_LOGI(TAG, "known plug rejoined"); // update short address just in case? 
             }
             else if (event.type == ZIGBEE_EVENT_DEVICE_NOT_FOUND) {
-                if (check_joining_with_ieee(event.data.device_joining.ieee_address, event.short_address)){
-                    ESP_LOGI(TAG, "known plug failed to be found...");
+                if (plug){
+                    ESP_LOGI(TAG, "known plug failed to be found again...");
                 } else ESP_LOGE(TAG, "unkonw device not found. RESET DEVICE!");
             }
             else if (event.type == ZIGBEE_EVENT_BINDING_SUCCESSFUL) { 
                 if (plug) {
-                    ESP_LOGI(TAG, "Binding successful for plug: 0x%04hx. Sending report, multiplier and divioser request.", event.short_address);
+                    ESP_LOGI(TAG, "Binding successful for plug: 0x%04hx 0x%016llx. Sending report, multiplier and divioser request.", plug->short_addr, event.ieee_address);
                     esp_zigbee_lock_acquire(portMAX_DELAY);
-                    send_configure_reporting(plug->short_addr, plug->endpoint);
-                    read_electrical_measurement_multipliers(plug->short_addr, plug->endpoint);
-                    read_energy_consumption_multipliers(plug->short_addr, plug->endpoint);
+                    send_configure_reporting(plug->short_addr, plug->endpoint); 
+                    read_electrical_measurement_multipliers(plug->short_addr, plug->endpoint); // should these be part of joining 
+                    read_energy_consumption_multipliers(plug->short_addr, plug->endpoint); // part of joining?
                     esp_zigbee_lock_release();
                 }
-                else ESP_LOGW(TAG, "binding successful for plug which is not on maps. (0x%04hx)", event.short_address);
+                else ESP_LOGW(TAG, "binding successful for plug which is not on map. (0x%04hx)", plug->short_addr);
             } 
             else if (event.type == ZIGBEE_EVENT_BINDING_ERROR) {
                 if (plug) {
-                    ESP_LOGW(TAG, "Binding error with a plug added to maps. Please reset. (0x%04hx)", event.short_address); 
+                    ESP_LOGW(TAG, "Binding error with a plug added to maps. Please reset. (0x%04hx) (0x%016llx)", plug->short_addr, event.ieee_address); 
                 } // need to check if ieee address is found regardless of short address (short address may cahnge....) or do we... need to think about this more... 
-                else ESP_LOGE(TAG, "Binding error with unknown plug: 0x%04hx. Please reset the plug to factory settings and try again", event.short_address); 
+                else ESP_LOGE(TAG, "Binding error with unknown plug: 0x%04hx. Please reset the plug to factory settings and try again", plug->short_addr); 
             }
             else if (event.type == ZIGBEE_EVENT_DEVICE_LEFT) { 
-                ESP_LOGI(TAG, "smart plug left: 0x%04hx", event.short_address);
+                ESP_LOGI(TAG, "smart plug left: 0x%04hx", plug->short_addr);
                 if (plug) {
-                    delete_device_from_both_maps(event.short_address);
+                    devices.erase(event.ieee_address);
                 }
                 else ESP_LOGW(TAG, "unkonwn devices left");
             }
@@ -172,7 +172,7 @@ void ZigbeeCoordinator::run(){
                     else if (event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID) {
                         plug->supports_electrical_measurement = false; 
                     }
-                    else ESP_LOGE(TAG, "unkown unsupported attribute from smart plug: 0x%04hx", event.short_address); 
+                    else ESP_LOGE(TAG, "unkown unsupported attribute from smart plug: 0x%04hx", plug->short_addr); 
                 }
             }
             else ESP_LOGW(TAG, "unknown event type");
@@ -206,7 +206,6 @@ int ZigbeeCoordinator::check_device_count(){
     for (const auto& [key, value] : devices) {
         printf("Device: 0x%04hx\n", value.short_addr); 
     }
-    printf("address map size: %d\n", devices_address_map.size()); 
     return devices.size(); 
 }
 
@@ -217,48 +216,6 @@ void ZigbeeCoordinator::toggle_smart_plug(uint16_t short_addr){
 }
 
 // private methods 
-smartPlug* ZigbeeCoordinator::find_smart_plug_with_short_addr(uint16_t short_addr){ // this we can trust on every other event execept DEVICE_JOINING 
-    auto it = devices_address_map.find(short_addr);
-    
-    if (it != devices_address_map.end()){
-        auto plug = devices.find(it->second); 
-        return (plug != devices.end()) ? &plug->second : nullptr; 
-    } else return nullptr; 
-}
-
-bool ZigbeeCoordinator::check_joining_with_ieee(uint64_t ieee_addr, uint16_t short_addr){ // ieee_address can never change. If we want to know for sure if the short address is changed we check it with this. 
-    auto it = devices.find(ieee_addr); 
-    if (it != devices.end()) {
-        if (short_addr == it->second.short_addr) ESP_LOGI(TAG, "device rejoined with the same short address");
-        else {
-            it->second.short_addr = short_addr;
-            ESP_LOGW(TAG, "device rejoined with new short address. Update both maps.");
-            update_devices_address_map(ieee_addr, short_addr);
-        }
-        return true;   
-    } return false;
-}
-
-void ZigbeeCoordinator::delete_device_from_both_maps(uint16_t short_addr){
-    auto it = devices_address_map.find(short_addr);
-    if (it != devices_address_map.end()){
-        devices.erase(it->second);
-    } else ESP_LOGE(TAG, "trying to delete unkonw devices from devices map.");
-    devices_address_map.erase(short_addr); 
-}
-
-void ZigbeeCoordinator::update_devices_address_map(uint64_t ieee_addr, uint16_t short_addr){
-    auto it = std::find_if(devices_address_map.begin(), devices_address_map.end(), [ieee_addr](const auto& pair){
-        return pair.second == ieee_addr;
-    });
-
-    if (it != devices_address_map.end()) {
-        devices_address_map.erase(it);
-        devices_address_map[short_addr] = ieee_addr;
-        ESP_LOGW(TAG, "address map updated.");
-    } else ESP_LOGE(TAG, "ieee address not found from address map (inside update_devices_address_map function.).");
-}
-
 
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){
     uint16_t metering_attrs[] = {

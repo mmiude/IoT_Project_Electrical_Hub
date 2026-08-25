@@ -25,7 +25,7 @@ private:
 
     //device map/vector/something to keep track of smart plugs
     std::map<uint64_t, smartPlug> devices;
-    std::map<uint16_t, uint64_t> devices_address_map; 
+    //std::map<uint16_t, uint64_t> devices_address_map; 
 
     smartPlug* find_smart_plug_with_short_addr(uint16_t short_addr); 
     bool check_joining_with_ieee(uint64_t ieee_addr, uint16_t short_addr);
