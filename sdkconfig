@@ -2313,12 +2313,6 @@ CONFIG_DEFAULT_PIN_TO_RCP_BOOT=8
 CONFIG_DEFAULT_PIN_TO_RCP_TX=17
 CONFIG_DEFAULT_PIN_TO_RCP_RX=18
 # end of OpenThread RCP Update
-
-#
-# ESP Zigbee DevKit LED Configuration
-#
-CONFIG_GPIO_LED_ON_DEVKIT=8
-# end of ESP Zigbee DevKit LED Configuration
 # end of Component config
 
 # CONFIG_IDF_EXPERIMENTAL_FEATURES is not set
