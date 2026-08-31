@@ -8,8 +8,8 @@ dependencies:
     version: ">=5.2"
   espressif/esp-zigbee-lib:
     version: ">=2.0.0"
-  light_driver:
-    path: "../../utils/light_driver"
+  # light_driver:
+  #   path: "../../utils/light_driver"
   alarm_timer:
     path: "../../utils/alarm_timer"
   protocol_examples_common:

@@ -2,7 +2,7 @@ dependencies:
   alarm_timer:
     dependencies: []
     source:
-      path: C:\Users\Mmiud\Documents\IoT-Project\utils\alarm_timer
+      path: /home/aleksnor/school/iot/iot_project/utils/alarm_timer
       type: local
     version: '*'
   espressif/esp-serial-flasher:
@@ -23,7 +23,7 @@ dependencies:
       type: service
     version: 1.8.0
   espressif/esp-zigbee-lib:
-    component_hash: 823ee1604d896bdcfd3d5dbe2b1eb84fdf089cffcbbe50e46d01d647861710ba
+    component_hash: d508f9b91c4b1973e6563fe840923fad2f15b23637f3d743dba1f5a719e1baab
     dependencies:
     - name: idf
       require: private
@@ -31,9 +31,9 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 2.0.0
+    version: 2.0.4
   espressif/esp_rcp_update:
-    component_hash: 743cf2528dbd992590eb8e4dd8133f9486a3a55fc3837afed438e60a62b05267
+    component_hash: b71f8ea677b64c3be296b2bfc5f8e480f66ad3f290249c3da56886738b97d6f1
     dependencies:
     - name: espressif/esp-serial-flasher
       registry_url: https://components.espressif.com
@@ -45,7 +45,7 @@ dependencies:
     source:
       registry_url: https://components.espressif.com/
       type: service
-    version: 1.6.1
+    version: 1.6.2
   espressif/led_strip:
     component_hash: 7e92a0c8a2e35b40904f88e88ce3c0dffff504a2763f70fba7ef4787cf2eec83
     dependencies:
@@ -60,16 +60,10 @@ dependencies:
     source:
       type: idf
     version: 5.5.4
-  light_driver:
-    dependencies: []
-    source:
-      path: C:\Users\Mmiud\Documents\IoT-Project\utils\light_driver
-      type: local
-    version: '*'
   protocol_examples_common:
     dependencies: []
     source:
-      path: C:\esp\esp-idf\v5.5.4\esp-idf\examples\common_components\protocol_examples_common
+      path: /home/aleksnor/Documents/esp-idf-v5.5.4/examples/common_components/protocol_examples_common
       type: local
     version: '*'
 direct_dependencies:
@@ -79,8 +73,7 @@ direct_dependencies:
 - espressif/esp_rcp_update
 - espressif/led_strip
 - idf
-- light_driver
 - protocol_examples_common
-manifest_hash: 5e24fb977ee0a460a0f62c6b2422da6399bdacece52e03169b82930a1179382c
+manifest_hash: cd528c329d72045843a4c3924ef6aa324274f2cf349daa4d8dcbf1027410f118
 target: esp32c6
 version: 2.0.0
