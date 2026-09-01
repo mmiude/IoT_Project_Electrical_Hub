@@ -210,11 +210,15 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     } break;
     case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { 
         uint8_t duration = *(uint8_t *)ezb_app_signal_get_params(app_signal);
+        zigbee_event event; 
         if (duration) {
             ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration);
-        } else {
+            event.type = ZIGBEE_EVENT_NETWORK_OPEN;
+        } else { 
             ESP_LOGW(TAG, "Network(0x%04hx) closed, devices joining not allowed.", ezb_nwk_get_panid());
+            event.type = ZIGBEE_EVENT_NETWORK_CLOSED;
         }
+        xQueueSend(event_queue, &event, 0);
     } break;
     default:
         ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); 

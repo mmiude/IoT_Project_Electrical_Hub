@@ -179,6 +179,11 @@ void ZigbeeCoordinator::run(){
                     plug->automatic_state_reporting = false;
                 } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
                 break; 
+            case ZIGBEE_EVENT_NETWORK_OPEN:
+                ESP_LOGI(TAG, "Network open for 3 mins");
+                break;
+            case ZIGBEE_EVENT_NETWORK_CLOSED:
+                ESP_LOGI(TAG, "Network close");
             default:
                 ESP_LOGW(TAG, "unknown event type");
                 break;
