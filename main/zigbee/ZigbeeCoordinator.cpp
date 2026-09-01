@@ -3,7 +3,7 @@
 
 static const char *TAG = "COORDINATOR"; 
 
-ZigbeeCoordinator::ZigbeeCoordinator(){
+ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue) : controller_queue(controller_queue){
 
     event_queue_t = zigbee_gateway_get_queue();
     ESP_LOGI(TAG, "Start ESP Zigbee Stack");

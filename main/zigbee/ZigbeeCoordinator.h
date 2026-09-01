@@ -10,7 +10,7 @@
 //this class inherits controllerInterface class and subject class 
 class ZigbeeCoordinator : public IDeviceProtocol {
 public:
-    ZigbeeCoordinator();
+    ZigbeeCoordinator(QueueHandle_t controller_queue);
 
     void request_energy_consumption_values(uint64_t device_id) override;
     void request_electrical_values(uint64_t device_id) override;
@@ -28,6 +28,7 @@ private:
 
     TaskHandle_t handle;
     QueueHandle_t event_queue_t = NULL;
+    QueueHandle_t controller_queue;
 
     std::map<uint64_t, smartPlug> devices;
 

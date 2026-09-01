@@ -26,6 +26,8 @@
 #include "jwt.h"
 #include "device_sign.h"
 
+#include "HubController.h"
+
 
 #define UART_PORT_NUM      UART_NUM_0
 #define BUF_SIZE           (1024)
@@ -58,13 +60,20 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
-    EventGroupHandle_t wifi_eg = xEventGroupCreate();
-    IPStack ipstack(SSID, PW, wifi_eg);
+    //EventGroupHandle_t wifi_eg = xEventGroupCreate();
+    //IPStack ipstack(SSID, PW, wifi_eg);
 
-    static TaskHandle_t dummy_task_handle;
+    //static TaskHandle_t dummy_task_handle;
 
     //xTaskCreate(dummy_task, "DUMMY", 2048, (void*)wifi_eg, tskIDLE_PRIORITY + 1, &dummy_task_handle); 
-    DeviceSign device_sign(&ipstack, wifi_eg, dummy_task_handle);
+    //DeviceSign device_sign(&ipstack, wifi_eg, dummy_task_handle);
+    static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
+
+    static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
+        std::make_shared<ZigbeeCoordinator>(controllerQueue)
+    };
+
+    static HubController controller(protocols);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
