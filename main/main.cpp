@@ -48,6 +48,8 @@ void dummy_task(void *params) {
         coordinator.set_smart_plug_on(1, 1);
         vTaskDelay(pdMS_TO_TICKS(5000));
         coordinator.get_on_off_state(1, 1); 
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        coordinator.open_network();
     }
 }
 

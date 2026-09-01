@@ -246,6 +246,13 @@ void ZigbeeCoordinator::get_on_off_state(uint16_t short_addr, uint8_t ep){
     } 
 }
 
+void ZigbeeCoordinator::open_network(){
+    ESP_LOGI(TAG, "opening network");
+    esp_zigbee_lock_acquire(portMAX_DELAY);
+    ezb_bdb_open_network(180);
+    esp_zigbee_lock_release();
+}
+
 // private methods 
 
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){

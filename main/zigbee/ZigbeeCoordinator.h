@@ -18,6 +18,7 @@ public:
     void toggle_smart_plug(uint16_t short_addr, uint8_t ep);
     void set_smart_plug_on(uint16_t short_addr, uint8_t ep);
     void set_smart_plug_off(uint16_t short_addr, uint8_t ep);
+    void open_network();
 
 private: 
     static void runner(void *params);
