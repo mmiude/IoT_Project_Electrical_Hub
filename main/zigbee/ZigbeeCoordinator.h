@@ -10,11 +10,16 @@
 class ZigbeeCoordinator {
 public:
     ZigbeeCoordinator();
+
     //virtual function definitons 
-    void get_energy_consumption(uint16_t short_addr);
-    void get_electrical_values(uint16_t short_addr);
+    void get_energy_consumption(uint16_t short_addr, uint8_t ep);
+    void get_electrical_values(uint16_t short_addr, uint8_t ep);
+    void get_on_off_state(uint16_t short_addr, uint8_t ep);
     int check_device_count();
-    void toggle_smart_plug(uint16_t short_addr); 
+    void toggle_smart_plug(uint16_t short_addr, uint8_t ep);
+    void set_smart_plug_on(uint16_t short_addr, uint8_t ep);
+    void set_smart_plug_off(uint16_t short_addr, uint8_t ep);
+    void open_network();
 
 private: 
     static void runner(void *params);
@@ -23,14 +28,7 @@ private:
     TaskHandle_t handle;
     QueueHandle_t event_queue_t = NULL;
 
-    //device map/vector/something to keep track of smart plugs
     std::map<uint64_t, smartPlug> devices;
-    std::map<uint16_t, uint64_t> devices_address_map; 
-
-    smartPlug* find_smart_plug_with_short_addr(uint16_t short_addr); 
-    bool check_joining_with_ieee(uint64_t ieee_addr, uint16_t short_addr);
-    void update_devices_address_map(uint64_t ieee_addr, uint16_t short_addr);
-    void delete_device_from_both_maps(uint16_t short_addr);
 
     //commands to smart plugs 
     ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep);
@@ -39,13 +37,9 @@ private:
     ezb_err_t read_energy_consumption_value(uint16_t dst_addr, uint8_t dst_ep);
     esp_err_t read_plug_on_off_state(uint16_t dst_addr, uint8_t dst_ep);
     esp_err_t send_toggle_smart_plug(uint16_t dst_addr, uint8_t dst_ep);
+    esp_err_t send_on_smart_plug(uint16_t dst_addr, uint8_t dst_ep);
+    esp_err_t send_off_smart_plug(uint16_t dst_addr, uint8_t dst_ep);
     esp_err_t send_configure_reporting(uint16_t dst_addr, uint8_t dst_ep);
-
-    //binding methods 
-    ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr);
-    static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx);
-    ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst_ep);
-    static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, void *user_ctx);
 
 };
 

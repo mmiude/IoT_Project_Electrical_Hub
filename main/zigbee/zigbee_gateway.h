@@ -64,11 +64,13 @@ typedef enum {
     ZIGBEE_EVENT_SUMMATION_MULTIPLIER,
     ZIGBEE_EVENT_SUMMATION_DIVISOR,
     ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR,
+    ZIGBEE_EVENT_STATE_REPORTING_SUCCESS,
+    ZIGBEE_EVENT_STATE_REPORTING_ERROR,
 } zigbee_event_type;
 
 typedef struct {
     zigbee_event_type type;
-    uint16_t short_address;
+    uint64_t ieee_address;
     
     union zigbee_gateway
     {
@@ -87,7 +89,7 @@ typedef struct {
         uint32_t summation_divisor; 
         uint16_t unsupported_attr; 
         struct {
-            uint64_t ieee_address;
+            uint16_t short_addr;
             uint8_t endpoint;
         } device_joining; 
     } data;

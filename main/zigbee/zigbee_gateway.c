@@ -35,7 +35,9 @@ static uint64_t get_ieee_address(uint16_t short_addr)
 {
     ezb_extaddr_t ieee_addr;
     uint64_t extended_addr;
+    esp_zigbee_lock_acquire(portMAX_DELAY);
     ezb_address_extended_by_short(short_addr, &ieee_addr);
+    esp_zigbee_lock_release();
     memcpy(&extended_addr, &ieee_addr, sizeof(uint64_t));
     return extended_addr;
 }
@@ -49,17 +51,17 @@ static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, 
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .ieee_address = ieee_addr};
             xQueueSend(event_queue, &event, 0);
         } else {
             ESP_LOGE(TAG, "Failed to bind smart plug device with status (0x%02x)", result->rsp->status);
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr};
             xQueueSend(event_queue, &event, 0);
             // send binding error signal
         }
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device with error (0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr};
         xQueueSend(event_queue, &event, 0);
         //send binding error signal
     }
@@ -90,7 +92,7 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
         ESP_LOGI(TAG, "Attempt to bind smart plug device (short address: 0x%04hx)", dst_short_addr);
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device (short address: 0x%04hx) with error(0x%04x)", dst_short_addr, ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .short_address = dst_short_addr, .data.device_joining = {.ieee_address = get_ieee_address(dst_short_addr)}}; 
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = get_ieee_address(dst_short_addr)}; 
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -99,22 +101,20 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
 static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx)
 {
     uint64_t ieee_addr = get_ieee_address((uint16_t)(uintptr_t) user_ctx);
-    ESP_LOGE(TAG, "ieee_addr: %d", ieee_addr);
 
     assert(result);
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS && result->rsp->match_length > 0 &&
             result->rsp->match_list) {
             for (size_t i = 0; i < result->rsp->match_length; i++) {
-                ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
-                zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr, .endpoint = result->rsp->match_list[i]}};
+                zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .ieee_address = ieee_addr, .data.device_joining = {.short_addr = (uint16_t)(uintptr_t) user_ctx, .endpoint = result->rsp->match_list[i]}};
                 xQueueSend(event_queue, &event, 0);  
                 zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
             }
         }
     } else {
         ESP_LOGE(TAG, "Failed to find smart plug device in the network with error(0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = (uint16_t)(uintptr_t) user_ctx, .data.device_joining = {.ieee_address = ieee_addr}};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = ieee_addr};
         xQueueSend(event_queue, &event, 0);
     }
 }
@@ -142,7 +142,7 @@ static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
         ESP_LOGI(TAG, "Attempt to find smart_plug device");
     } else {
         ESP_LOGE(TAG, "Failed to find smart_plug device with error(0x%04x)", ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .short_address = dst_addr, .data.device_joining = {.ieee_address = get_ieee_address(dst_addr)}};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = get_ieee_address(dst_addr)};
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -170,21 +170,21 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
                 ESP_LOGI(TAG, "Device reboot");
             }
         } else {
-            ESP_LOGW(TAG, "The %s failed with status(0x%02x), please retry", ezb_app_signal_to_string(signal_type), status);
-            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_INITIALIZATION, 1000); // if network formation fails this will try again
+            ESP_LOGW(TAG, "The %s failed with status(0x%02x), please retry", ezb_app_signal_to_string(signal_type), status); // send a fail signal if formation fails so the end user will know
+            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_INITIALIZATION, 1000); 
         }
     } break;
     case EZB_BDB_SIGNAL_FORMATION: {
         ezb_bdb_comm_status_t status = *((ezb_bdb_comm_status_t *)ezb_app_signal_get_params(app_signal));
         if (status == EZB_BDB_STATUS_SUCCESS) {
             ezb_extpanid_t extended_pan_id;
-            ezb_nwk_get_extended_panid(&extended_pan_id); // get extended network id
+            ezb_nwk_get_extended_panid(&extended_pan_id); 
             ESP_LOGI(TAG, "Formed network successfully: PAN ID(0x%04hx, EXT: 0x%llx), Channel(%d), Short Address(0x%04hx)",
                      ezb_nwk_get_panid(), extended_pan_id.u64, ezb_nwk_get_current_channel(), ezb_nwk_get_short_address());
             ezb_bdb_start_top_level_commissioning(EZB_BDB_MODE_NETWORK_STEERING); // stat steering (devices can find network and join)
         } else {
             ESP_LOGW(TAG, "Failed to form network with status(0x%02x)", status);
-            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_NETWORK_FORMATION, 1000); // try again
+            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_NETWORK_FORMATION, 1000); 
         }
     } break;
     case EZB_BDB_SIGNAL_STEERING: {
@@ -203,21 +203,21 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     } break;
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: { 
         const ezb_zdo_signal_leave_indication_params_t *leave_ind_params = ezb_app_signal_get_params(app_signal);
-        ESP_LOGI(TAG, "Zigbee Node(0x%04hx) is leaving network", leave_ind_params->short_addr); 
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .short_address = leave_ind_params->short_addr};   
-        ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+        ESP_LOGI(TAG, "Zigbee Node(0x%04hx) (0x%016llx) is leaving network", leave_ind_params->short_addr, get_ieee_address(leave_ind_params->short_addr)); 
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .ieee_address = get_ieee_address(leave_ind_params->short_addr)};   
+        //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0); 
     } break;
-    case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { // TODO: how can we open network once requested? 
+    case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { 
         uint8_t duration = *(uint8_t *)ezb_app_signal_get_params(app_signal);
         if (duration) {
-            ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration); // network ezb_nwk_get_panid() gives network id 
+            ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration);
         } else {
             ESP_LOGW(TAG, "Network(0x%04hx) closed, devices joining not allowed.", ezb_nwk_get_panid());
         }
     } break;
     default:
-        ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); // default if some signal not specified comes in
+        ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); 
         break;
     }
     return true;
@@ -239,9 +239,9 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     if (response->attr_id == EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) 
     {
         bool is_on = *(bool *)response->attr_value;
-        ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
-        zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .short_address = header->src_addr.u.short_addr, .data.is_on = is_on ? true : false};   
-        ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+        //ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
+        zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.is_on = is_on ? true : false};   
+        //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0);
     }
     else
@@ -256,11 +256,10 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
     ezb_zcl_read_attr_rsp_variable_t *response = message->in.variables;
     const ezb_zcl_cmd_hdr_t *header = message->in.header;
 
-    ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(0x%04hx)", header->src_ep, header->src_addr.u.short_addr);
-    // TODO: here we need to somehow set metering -> false if not supported and if electrical is not supported we don't add that plug at all. 
+    //ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(0x%04hx)", header->src_ep, header->src_addr.u.short_addr);
     if (response->status != 0) {
-        ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(0x%04hx)", response->attr_id, header->src_addr.u.short_addr);
-        zigbee_event event = {.type = ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR, .short_address = header->src_addr.u.short_addr, .data.unsupported_attr = response->attr_id};
+        //ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(0x%04hx)", response->attr_id, header->src_addr.u.short_addr);
+        zigbee_event event = {.type = ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.unsupported_attr = response->attr_id};
         xQueueSend(event_queue, &event, 0);
     } 
 
@@ -274,64 +273,64 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
             {
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID: {
                     int16_t power = *(int16_t *) response->attr_value;
-                    ESP_LOGW(TAG, "Electrical active power: status: %d, type: %d, value: %d", response->status, response->attr_type, power);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_power = power};   
+                    //ESP_LOGW(TAG, "Electrical active power: status: %d, type: %d, value: %d", response->status, response->attr_type, power);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_power = power};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_VOLTAGE_ID: {
                     uint16_t voltage = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical rms voltage: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage};   
+                    //ESP_LOGW(TAG, "Electrical rms voltage: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_voltage = voltage};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMS_CURRENT_ID: {
                     uint16_t current = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical rms current: status: %d, type: %d, value: %d", response->status, response->attr_type, current);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_current = current};   
+                    //ESP_LOGW(TAG, "Electrical rms current: status: %d, type: %d, value: %d", response->status, response->attr_type, current);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_current = current};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID: {
                     uint16_t power_multi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac power multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, power_multi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_MULTIPLIER, .short_address = header->src_addr.u.short_addr, .data.raw_power = power_multi};   
+                    //ESP_LOGW(TAG, "Electrical ac power multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, power_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_MULTIPLIER, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_power = power_multi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_DIVISOR_ID: {
                     uint16_t power_divi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac power divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, power_divi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_DIVISOR, .short_address = header->src_addr.u.short_addr, .data.raw_power = power_divi};   
+                    //ESP_LOGW(TAG, "Electrical ac power divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, power_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_POWER_DIVISOR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_power = power_divi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_DIVISOR_ID: {
                     uint16_t voltage_divi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac voltage divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_divi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_DIVISOR, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage_divi};   
+                    //ESP_LOGW(TAG, "Electrical ac voltage divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_DIVISOR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_voltage = voltage_divi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID: {
                     uint16_t voltage_multi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac voltage multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_multi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_MULTIPLIER, .short_address = header->src_addr.u.short_addr, .data.raw_voltage = voltage_multi};   
+                    //ESP_LOGW(TAG, "Electrical ac voltage multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, voltage_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_VOLTAGE_MULTIPLIER, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_voltage = voltage_multi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID: {
                     uint16_t current_multi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac current multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, current_multi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_MULTIPLIER, .short_address = header->src_addr.u.short_addr, .data.raw_current = current_multi};   
+                    //ESP_LOGW(TAG, "Electrical ac current multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, current_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_MULTIPLIER, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_current = current_multi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_DIVISOR_ID: {
                     uint16_t current_divi = *(uint16_t *) response->attr_value; 
-                    ESP_LOGW(TAG, "Electrical ac current divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, current_divi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_DIVISOR, .short_address = header->src_addr.u.short_addr, .data.raw_current = current_divi};   
+                    //ESP_LOGW(TAG, "Electrical ac current divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, current_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_CURRENT_DIVISOR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_current = current_divi};   
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
@@ -341,31 +340,29 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
             }
             break;
         case EZB_ZCL_CLUSTER_ID_METERING: // value is in response->attr_value
-            //smartPlug.support_metering = true;
-
             switch (response->attr_id)
             {
                 case EZB_ZCL_ATTR_METERING_CURRENT_SUMMATION_DELIVERED_ID: {
                     uint64_t summation = *(uint64_t *) response->attr_value;
-                    ESP_LOGW(TAG, "Metering current summation: status: %d, type: %d, value: %d", response->status, response->attr_type, summation);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_REPORT, .short_address = header->src_addr.u.short_addr, .data.raw_summation = summation};   
-                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    //ESP_LOGW(TAG, "Metering current summation: status: %d, type: %d, value: %d", response->status, response->attr_type, summation);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_summation = summation};   
+                    //ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
                 case EZB_ZCL_ATTR_METERING_MULTIPLIER_ID: {
                     uint32_t metering_multi = *(uint32_t *) response->attr_value;
-                    ESP_LOGW(TAG, "Metering multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_multi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_MULTIPLIER, .short_address = header->src_addr.u.short_addr, .data.raw_summation = metering_multi};   
-                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    //ESP_LOGW(TAG, "Metering multiplier: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_multi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_MULTIPLIER, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_summation = metering_multi};   
+                    //ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
                     xQueueSend(event_queue, &event, 0);
                     break;   
                     }           
                 case EZB_ZCL_ATTR_METERING_DIVISOR_ID: {
                     uint32_t metering_divi = *(uint32_t *) response->attr_value;
-                    ESP_LOGW(TAG, "Metering divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_divi);
-                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_DIVISOR, .short_address = header->src_addr.u.short_addr, .data.raw_summation = metering_divi};   
-                    ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
+                    //ESP_LOGW(TAG, "Metering divisor: status: %d, type: %d, value: %d", response->status, response->attr_type, metering_divi);
+                    zigbee_event event = {.type = ZIGBEE_EVENT_SUMMATION_DIVISOR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.raw_summation = metering_divi};   
+                    //ESP_LOGW("GATEWAY", "Sending to queue handle: %p", event_queue);
                     xQueueSend(event_queue, &event, 0);
                     break;
                     }
@@ -373,6 +370,13 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
                     ESP_LOGE(TAG, "Unknown attribute id in attribute read response handler (metering).");
                     break;
             }
+            break;
+        case EZB_ZCL_CLUSTER_ID_ON_OFF:
+            bool is_on = *(bool *)response->attr_value;
+            //ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s MANUALLY REQUESTED", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
+            zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.is_on = is_on ? true : false};   
+            //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+            xQueueSend(event_queue, &event, 0);
             break;
         default:
             ESP_LOGE(TAG, "Unknown cluster id in attribute read response handler.");
@@ -387,15 +391,19 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
     ezb_zcl_cmd_config_report_rsp_message_t *response = (ezb_zcl_cmd_config_report_rsp_message_t *)message;
     const ezb_zcl_cmd_hdr_t *header = response->in.header;
 
-    ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(0x%04hx)", response->info.cluster_id, header->src_addr.u.short_addr);
+    //ESP_LOGI(TAG, "Configure reporting response from cluster(0x%04x) smart plug(0x%04hx)", response->info.cluster_id, header->src_addr.u.short_addr);
 
     ezb_zcl_config_report_rsp_variable_t *response_variable = response->in.variables;
     while (response_variable != NULL) {
         if (response_variable->status == EZB_ZCL_STATUS_SUCCESS) {
-            ESP_LOGI(TAG, "  All attributes accepted (status SUCCESS)");
+            //ESP_LOGI(TAG, "  All attributes accepted (status SUCCESS)");
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_SUCCESS, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            xQueueSend(event_queue, &event, 0);
         } else {
-            ESP_LOGW(TAG, "  attr(0x%04x) FAILED with status(0x%02x)",
-            response_variable->attr_id, response_variable->status);
+            //ESP_LOGW(TAG, "  attr(0x%04x) FAILED with status(0x%02x)",
+            //response_variable->attr_id, response_variable->status);
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            xQueueSend(event_queue, &event, 0);
         }
         response_variable = response_variable->next;
     }
@@ -404,7 +412,7 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
 
 static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t callback_id, void *message) {
 
-    ESP_LOGI(TAG, "ZCL action callback ID: 0x%04lx", callback_id);
+    //ESP_LOGI(TAG, "ZCL action callback ID: 0x%04lx", callback_id);
     
     switch (callback_id) {
 
@@ -454,7 +462,6 @@ esp_err_t esp_zigbee_create_zha_gateway_device(void)
     ESP_ERROR_CHECK(ezb_af_device_desc_register(dev_desc));
 
     ezb_zcl_core_action_handler_register(esp_zigbee_zcl_core_action_handler); 
-    //ezb_zcl_raw_command_handler_register(raw_frame_handler);
 
     return ESP_OK;
 }
