@@ -40,13 +40,20 @@ void ZigbeeCoordinator::run(){
                         .short_addr = event.data.device_joining.short_addr,
                         .endpoint = event.data.device_joining.endpoint,
                     }); 
-                    if (devices_inserted) ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
-                    // check multipliers here...? 
-                } else ESP_LOGI(TAG, "known plug rejoined");
+                    if (devices_inserted){
+                        ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
+                        read_electrical_measurement_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // should these be part of joining 
+                        read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // part of joining?
+                    } 
+                } else {
+                     ESP_LOGI(TAG, "known plug rejoined");
+                     plug->short_addr = event.data.device_joining.short_addr;  // update short address in case it has changed 
+                }
                 break; 
             case ZIGBEE_EVENT_DEVICE_NOT_FOUND:
                 if (plug){
-                    ESP_LOGI(TAG, "known plug failed to be found again...");
+                    ESP_LOGI(TAG, "known plug failed to be found again..."); // needs testing... this might happen because of timeout error, but plug has reproting configured already...
+                    plug->short_addr = event.data.device_joining.short_addr; // update short address in case it has changed
                 } else ESP_LOGE(TAG, "unkonw device not found. RESET DEVICE!");
                 break;
             case ZIGBEE_EVENT_BINDING_SUCCESSFUL:
@@ -54,11 +61,9 @@ void ZigbeeCoordinator::run(){
                     ESP_LOGI(TAG, "Binding successful for plug: 0x%04hx 0x%016llx. Sending report, multiplier and divioser request.", plug->short_addr, event.ieee_address);
                     esp_zigbee_lock_acquire(portMAX_DELAY);
                     send_configure_reporting(plug->short_addr, plug->endpoint); 
-                    read_electrical_measurement_multipliers(plug->short_addr, plug->endpoint); // should these be part of joining 
-                    read_energy_consumption_multipliers(plug->short_addr, plug->endpoint); // part of joining?
                     esp_zigbee_lock_release();
                 }
-                else ESP_LOGW(TAG, "binding successful for plug which is not on map. (0x%016llx)", event.ieee_address);
+                else ESP_LOGW(TAG, "binding successful for plug which is not on map. (0x%016llx)", event.ieee_address); // this should never happen 
                 break;
             case ZIGBEE_EVENT_BINDING_ERROR:
                 if (plug) {
