@@ -33,10 +33,10 @@
 static const char *TAG = "MAIN"; 
 
 
-void dummy_task(void *params) { 
+/*void dummy_task(void *params) { 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    static ZigbeeCoordinator coordinator;
+    static IDeviceProtocol coordinator;
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(15000));
@@ -51,7 +51,7 @@ void dummy_task(void *params) {
         vTaskDelay(pdMS_TO_TICKS(5000));
         coordinator.open_network();
     }
-}
+}*/
 
 extern "C" void app_main(void)
 {
@@ -63,7 +63,7 @@ extern "C" void app_main(void)
 
     static TaskHandle_t dummy_task_handle;
 
-    xTaskCreate(dummy_task, "DUMMY", 2048, (void*)wifi_eg, tskIDLE_PRIORITY + 1, &dummy_task_handle); 
+    //xTaskCreate(dummy_task, "DUMMY", 2048, (void*)wifi_eg, tskIDLE_PRIORITY + 1, &dummy_task_handle); 
     DeviceSign device_sign(&ipstack, wifi_eg, dummy_task_handle);
     
     while (1) {

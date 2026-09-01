@@ -29,8 +29,9 @@ void ZigbeeCoordinator::run(){
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
 
-            auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
-            smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
+            auto plug = find_plug(event.ieee_address);
+            //auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
+            //smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
 
             switch (event.type) 
             {
@@ -186,69 +187,59 @@ void ZigbeeCoordinator::run(){
     }
 }
 
-// public methods. Will be used through controller interface eventually. // these will take IEEE_address as parameter -> would support matter also this way -> search correct plug and so on...
-
-void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr, uint8_t ep){ 
-    for (const auto& [key, value] : devices) {
-        if (value.supports_electrical_measurement) {
-            esp_zigbee_lock_acquire(portMAX_DELAY);
-            read_electrical_measurement_values(value.short_addr, value.endpoint); 
-            esp_zigbee_lock_release();
-        }  
-    }
-}
-
-void ZigbeeCoordinator::get_electrical_values(uint16_t short_addr, uint8_t ep){
-    for (const auto& [key, value] : devices) {
-        if (value.supports_metering) {
-            esp_zigbee_lock_acquire(portMAX_DELAY);
-            read_energy_consumption_value(value.short_addr, value.endpoint); 
-            esp_zigbee_lock_release();
-        }
-    }
-}
-
-int ZigbeeCoordinator::check_device_count(){
-    for (const auto& [key, value] : devices) {
-        printf("Device short_addr: 0x%04hx, key: 0x%016llx\n", value.short_addr, key); 
-    }
-    return devices.size(); 
-}
-
-void ZigbeeCoordinator::toggle_smart_plug(uint16_t short_addr, uint8_t ep){
-    esp_zigbee_lock_acquire(portMAX_DELAY);
-    send_toggle_smart_plug(short_addr, devices[short_addr].endpoint);
-    esp_zigbee_lock_release();
-}
-
-void ZigbeeCoordinator::set_smart_plug_on(uint16_t short_addr, uint8_t ep){
-    for (const auto& [key, value] : devices) {
-        {
+// public methods - accessed via IDeviceProtocol interface 
+void ZigbeeCoordinator::request_energy_consumption_values(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
-        send_on_smart_plug(value.short_addr, value.endpoint); 
+        read_energy_consumption_value(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
-        }
-    }
+    } else ESP_LOGE(TAG, "Requesting energy consumption values failed. Unknown plug!");
 }
 
-void ZigbeeCoordinator::set_smart_plug_off(uint16_t short_addr, uint8_t ep){
-    for (const auto& [key, value] : devices) {
-        {
+void ZigbeeCoordinator::request_electrical_values(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
-        send_off_smart_plug(value.short_addr, value.endpoint); 
+        read_electrical_measurement_values(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
-        }
-    }
+    } else ESP_LOGE(TAG, "Requesting electrical values failed. Unknown plug!"); 
 }
 
-void ZigbeeCoordinator::get_on_off_state(uint16_t short_addr, uint8_t ep){
-    for (const auto& [key, value] : devices) {
-        {
+void ZigbeeCoordinator::request_on_off_state(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
-        read_plug_on_off_state(value.short_addr, value.endpoint); 
+        read_plug_on_off_state(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
-        }
-    } 
+    } else ESP_LOGE(TAG, "Requesting on/off state failed. Unknown plug!");
+}
+
+void ZigbeeCoordinator::toggle_plug(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_toggle_smart_plug(plug->short_addr, plug->endpoint);
+        esp_zigbee_lock_release();
+    } else ESP_LOGE(TAG, "Sending toggle command failed. Unknown plug!");
+}
+
+void ZigbeeCoordinator::set_plug_on(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_on_smart_plug(plug->short_addr, plug->endpoint);
+        esp_zigbee_lock_release();
+    } else ESP_LOGE(TAG, "Sending on command failed. Unknown plug!");
+}
+
+void ZigbeeCoordinator::set_plug_off(uint64_t device_id){
+    auto plug = find_plug(device_id);
+    if (plug) {
+        esp_zigbee_lock_acquire(portMAX_DELAY);
+        send_off_smart_plug(plug->short_addr, plug->endpoint);
+        esp_zigbee_lock_release();
+    } else ESP_LOGE(TAG, "Sending off command failed. Unknown plug!");
 }
 
 void ZigbeeCoordinator::open_network(){
@@ -258,7 +249,19 @@ void ZigbeeCoordinator::open_network(){
     esp_zigbee_lock_release();
 }
 
+int ZigbeeCoordinator::check_device_count(){
+    for (const auto& [key, value] : devices) {
+        printf("Device short_addr: 0x%04hx, key: 0x%016llx\n", value.short_addr, key); 
+    }
+    return devices.size(); 
+}
+
+
 // private methods 
+smartPlug* ZigbeeCoordinator::find_plug(uint64_t ieee_addr){
+    auto it = devices.find(ieee_addr);  
+    return (it != devices.end()) ? &it->second : nullptr; 
+}
 
 ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep){
     uint16_t metering_attrs[] = {
