@@ -181,9 +181,9 @@ void ZigbeeCoordinator::run(){
     }
 }
 
-// public methods. Will be used through controller interface eventually. 
+// public methods. Will be used through controller interface eventually. // these will take IEEE_address as parameter -> would support matter also this way -> search correct plug and so on...
 
-void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr, uint8_t ep){
+void ZigbeeCoordinator::get_energy_consumption(uint16_t short_addr, uint8_t ep){ 
     for (const auto& [key, value] : devices) {
         if (value.supports_electrical_measurement) {
             esp_zigbee_lock_acquire(portMAX_DELAY);

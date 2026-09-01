@@ -101,14 +101,12 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
 static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_result_t *result, void *user_ctx)
 {
     uint64_t ieee_addr = get_ieee_address((uint16_t)(uintptr_t) user_ctx);
-    ESP_LOGE(TAG, "ieee_addr: 0x%016llx", ieee_addr);
 
     assert(result);
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS && result->rsp->match_length > 0 &&
             result->rsp->match_list) {
             for (size_t i = 0; i < result->rsp->match_length; i++) {
-                ESP_LOGW(TAG, "possible id: %d", result->rsp->match_list[i]);
                 zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_JOINED, .ieee_address = ieee_addr, .data.device_joining = {.short_addr = (uint16_t)(uintptr_t) user_ctx, .endpoint = result->rsp->match_list[i]}};
                 xQueueSend(event_queue, &event, 0);  
                 zdo_bind_smart_plug_device(result->rsp->nwk_addr_of_interest, result->rsp->match_list[i]);
@@ -172,21 +170,21 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
                 ESP_LOGI(TAG, "Device reboot");
             }
         } else {
-            ESP_LOGW(TAG, "The %s failed with status(0x%02x), please retry", ezb_app_signal_to_string(signal_type), status);
-            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_INITIALIZATION, 1000); // if network formation fails this will try again
+            ESP_LOGW(TAG, "The %s failed with status(0x%02x), please retry", ezb_app_signal_to_string(signal_type), status); // send a fail signal if formation fails so the end user will know
+            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_INITIALIZATION, 1000); 
         }
     } break;
     case EZB_BDB_SIGNAL_FORMATION: {
         ezb_bdb_comm_status_t status = *((ezb_bdb_comm_status_t *)ezb_app_signal_get_params(app_signal));
         if (status == EZB_BDB_STATUS_SUCCESS) {
             ezb_extpanid_t extended_pan_id;
-            ezb_nwk_get_extended_panid(&extended_pan_id); // get extended network id
+            ezb_nwk_get_extended_panid(&extended_pan_id); 
             ESP_LOGI(TAG, "Formed network successfully: PAN ID(0x%04hx, EXT: 0x%llx), Channel(%d), Short Address(0x%04hx)",
                      ezb_nwk_get_panid(), extended_pan_id.u64, ezb_nwk_get_current_channel(), ezb_nwk_get_short_address());
             ezb_bdb_start_top_level_commissioning(EZB_BDB_MODE_NETWORK_STEERING); // stat steering (devices can find network and join)
         } else {
             ESP_LOGW(TAG, "Failed to form network with status(0x%02x)", status);
-            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_NETWORK_FORMATION, 1000); // try again
+            alarm_timer_schedule(esp_zigbee_alarm_bdb_commissioning, EZB_BDB_MODE_NETWORK_FORMATION, 1000); 
         }
     } break;
     case EZB_BDB_SIGNAL_STEERING: {
@@ -210,16 +208,16 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
         ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0); 
     } break;
-    case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { // TODO: how can we open network once requested? 
+    case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { 
         uint8_t duration = *(uint8_t *)ezb_app_signal_get_params(app_signal);
         if (duration) {
-            ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration); // network ezb_nwk_get_panid() gives network id 
+            ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration);
         } else {
             ESP_LOGW(TAG, "Network(0x%04hx) closed, devices joining not allowed.", ezb_nwk_get_panid());
         }
     } break;
     default:
-        ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); // default if some signal not specified comes in
+        ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); 
         break;
     }
     return true;
@@ -241,9 +239,9 @@ static void zcl_core_report_attr_handler(ezb_zcl_cmd_report_attr_message_t *mess
     if (response->attr_id == EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) 
     {
         bool is_on = *(bool *)response->attr_value;
-        ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
+        //ESP_LOGI(TAG, "Plug ep(0x%04hx) on/off state: %s", header->src_addr.u.short_addr, is_on ? "ON" : "OFF");
         zigbee_event event = {.type = ZIGBEE_EVENT_ONOFF_REPORT, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.is_on = is_on ? true : false};   
-        ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
+        //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0);
     }
     else
@@ -258,8 +256,7 @@ static void zcl_core_read_attrbute_response(ezb_zcl_cmd_read_attr_rsp_message_t 
     ezb_zcl_read_attr_rsp_variable_t *response = message->in.variables;
     const ezb_zcl_cmd_hdr_t *header = message->in.header;
 
-    ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(0x%04hx)", header->src_ep, header->src_addr.u.short_addr);
-    // TODO: here we need to somehow set metering -> false if not supported and if electrical is not supported we don't add that plug at all. 
+    //ESP_LOGW(TAG, "SMART PLUG ATTRIBUTE RESPONSE: ep(%d), short address(0x%04hx)", header->src_ep, header->src_addr.u.short_addr);
     if (response->status != 0) {
         ESP_LOGE(TAG, "RESPONSE STATUS ERROR: attr(0x%04x) smart plug(0x%04hx)", response->attr_id, header->src_addr.u.short_addr);
         zigbee_event event = {.type = ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.unsupported_attr = response->attr_id};
