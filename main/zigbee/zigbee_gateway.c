@@ -210,11 +210,15 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     } break;
     case EZB_NWK_SIGNAL_PERMIT_JOIN_STATUS: { 
         uint8_t duration = *(uint8_t *)ezb_app_signal_get_params(app_signal);
+        zigbee_event event; 
         if (duration) {
             ESP_LOGI(TAG, "Network(0x%04hx) is open for %d seconds", ezb_nwk_get_panid(), duration);
-        } else {
+            event.type = ZIGBEE_EVENT_NETWORK_OPEN;
+        } else { 
             ESP_LOGW(TAG, "Network(0x%04hx) closed, devices joining not allowed.", ezb_nwk_get_panid());
+            event.type = ZIGBEE_EVENT_NETWORK_CLOSED;
         }
+        xQueueSend(event_queue, &event, 0);
     } break;
     default:
         ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); 
@@ -478,6 +482,8 @@ esp_err_t esp_zigbee_setup_commissioning(void)
 
 void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
 {
+    EventGroupHandle_t events = (EventGroupHandle_t)pvParameters;
+
     esp_zigbee_config_t zigbee_config = ESP_ZIGBEE_DEFAULT_CONFIG();
 
     ESP_ERROR_CHECK(esp_zigbee_init(&zigbee_config));
@@ -489,6 +495,8 @@ void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
     ESP_ERROR_CHECK(esp_zigbee_start(false));
 
     ESP_LOGI(TAG, "Starting zigbee main task");
+    xEventGroupSetBits(events, ZIGBEE_STACK_READY);
+    
     esp_zigbee_launch_mainloop();
 
     esp_zigbee_deinit();

@@ -26,32 +26,13 @@
 #include "jwt.h"
 #include "device_sign.h"
 
+#include "HubController.h"
+
 
 #define UART_PORT_NUM      UART_NUM_0
 #define BUF_SIZE           (1024)
 
 static const char *TAG = "MAIN"; 
-
-
-void dummy_task(void *params) { 
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    static ZigbeeCoordinator coordinator;
-
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(15000));
-        coordinator.get_electrical_values(1, 1); 
-        coordinator.get_energy_consumption(1, 1);
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        ESP_LOGI(TAG, "DEVICE COUNT: %d", coordinator.check_device_count());
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        coordinator.set_smart_plug_on(1, 1);
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        coordinator.get_on_off_state(1, 1); 
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        coordinator.open_network();
-    }
-}
 
 extern "C" void app_main(void)
 {
@@ -61,10 +42,14 @@ extern "C" void app_main(void)
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
     IPStack ipstack(SSID, PW, wifi_eg);
 
-    static TaskHandle_t dummy_task_handle;
+    DeviceSign device_sign(&ipstack, wifi_eg);
+    static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
 
-    xTaskCreate(dummy_task, "DUMMY", 2048, (void*)wifi_eg, tskIDLE_PRIORITY + 1, &dummy_task_handle); 
-    DeviceSign device_sign(&ipstack, wifi_eg, dummy_task_handle);
+    static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
+        std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)
+    };
+
+    static HubController controller(protocols, wifi_eg);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));

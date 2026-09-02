@@ -14,12 +14,12 @@ class DeviceSign
 private:
     IPStack *ipstack;
     EventGroupHandle_t wifi_eg;
-    TaskHandle_t zbTaskHandle;
+    //TaskHandle_t zbTaskHandle;
 
     static void sign_task(void *param);
 
 public:
-    DeviceSign(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, TaskHandle_t _zbTaskHandle);
+    DeviceSign(IPStack *_ipstack, EventGroupHandle_t _wifi_eg);
 };
 
 #endif

@@ -8,6 +8,7 @@
 #include "esp_zigbee.h"
 #include "ezbee/zha.h"
 
+#define ZIGBEE_STACK_READY BIT3
 
 #define ESP_ZIGBEE_PRIMARY_CHANNEL_MASK   ((1U << 13))
 #define ESP_ZIGBEE_SECONDARY_CHANNEL_MASK (0x07FFF800U)
@@ -66,6 +67,8 @@ typedef enum {
     ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR,
     ZIGBEE_EVENT_STATE_REPORTING_SUCCESS,
     ZIGBEE_EVENT_STATE_REPORTING_ERROR,
+    ZIGBEE_EVENT_NETWORK_OPEN,
+    ZIGBEE_EVENT_NETWORK_CLOSED,
 } zigbee_event_type;
 
 typedef struct {
