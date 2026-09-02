@@ -482,6 +482,8 @@ esp_err_t esp_zigbee_setup_commissioning(void)
 
 void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
 {
+    EventGroupHandle_t events = (EventGroupHandle_t)pvParameters;
+
     esp_zigbee_config_t zigbee_config = ESP_ZIGBEE_DEFAULT_CONFIG();
 
     ESP_ERROR_CHECK(esp_zigbee_init(&zigbee_config));
@@ -493,6 +495,8 @@ void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
     ESP_ERROR_CHECK(esp_zigbee_start(false));
 
     ESP_LOGI(TAG, "Starting zigbee main task");
+    xEventGroupSetBits(events, ZIGBEE_STACK_READY);
+    
     esp_zigbee_launch_mainloop();
 
     esp_zigbee_deinit();

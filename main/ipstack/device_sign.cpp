@@ -2,8 +2,8 @@
 
 static const char *TAG = "device_sign";
 
-DeviceSign::DeviceSign(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, TaskHandle_t _zbTaskHandle)
-: ipstack(_ipstack), wifi_eg(_wifi_eg), zbTaskHandle(_zbTaskHandle)
+DeviceSign::DeviceSign(IPStack *_ipstack, EventGroupHandle_t _wifi_eg)
+: ipstack(_ipstack), wifi_eg(_wifi_eg)
 {
     xTaskCreate(sign_task, "SIGN_TASK", 4096, static_cast<void*>(this),
         tskIDLE_PRIORITY + 1, NULL);
@@ -74,6 +74,8 @@ void DeviceSign::sign_task(void *param)
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
 
-    xTaskNotifyGive(device_sign->zbTaskHandle);
+    //xTaskNotifyGive(device_sign->zbTaskHandle);
+    xEventGroupSetBits(device_sign->wifi_eg, DEVICE_SIGN_READY); 
+
     vTaskSuspend(NULL);
 }

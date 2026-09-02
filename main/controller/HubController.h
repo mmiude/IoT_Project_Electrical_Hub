@@ -13,13 +13,14 @@
 
 class HubController {
 public:
-    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols); 
+    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events); 
 
 private:
     static void runner(void *params);
     void run();
 
     std::vector<std::shared_ptr<IDeviceProtocol>> plugProtocols;
+    EventGroupHandle_t event_group; 
     
     TaskHandle_t handle; 
     //QueueHandle_t controllerQueue;

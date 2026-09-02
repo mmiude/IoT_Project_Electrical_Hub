@@ -6,11 +6,13 @@
 #include "smartPlugInfo.h"
 #include "IDeviceProtocol.h"
 
+#define DEVICE_SIGN_READY   BIT2 
+
 
 //this class inherits controllerInterface class and subject class 
 class ZigbeeCoordinator : public IDeviceProtocol {
 public:
-    ZigbeeCoordinator(QueueHandle_t controller_queue);
+    ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupHandle_t events);
 
     void request_energy_consumption_values(uint64_t device_id) override;
     void request_electrical_values(uint64_t device_id) override;
@@ -26,9 +28,11 @@ private:
     static void runner(void *params);
     void run();
 
-    TaskHandle_t handle;
     QueueHandle_t event_queue_t = NULL;
     QueueHandle_t controller_queue;
+    EventGroupHandle_t event_group; 
+    TaskHandle_t task_handle;
+    TaskHandle_t gateway_task_handle;
 
     std::map<uint64_t, smartPlug> devices;
 

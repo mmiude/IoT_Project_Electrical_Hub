@@ -3,12 +3,11 @@
 
 static const char *TAG = "COORDINATOR"; 
 
-ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue) : controller_queue(controller_queue){
+ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupHandle_t events) : controller_queue(controller_queue), event_group(events) {
 
     event_queue_t = zigbee_gateway_get_queue();
-    ESP_LOGI(TAG, "Start ESP Zigbee Stack");
-    xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, NULL, tskIDLE_PRIORITY + 3, NULL); 
-    xTaskCreate(ZigbeeCoordinator::runner, "ZB_COORDINATOR", 4096 * 2, this, tskIDLE_PRIORITY + 2,  &handle);
+    //xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, NULL, tskIDLE_PRIORITY + 3, NULL); 
+    xTaskCreate(ZigbeeCoordinator::runner, "ZB_COORDINATOR", 4096 * 2, this, tskIDLE_PRIORITY + 2,  &task_handle);
 
 }
 
@@ -16,6 +15,10 @@ ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue) : controlle
 
 void ZigbeeCoordinator::runner(void *params){
     auto instance = static_cast<ZigbeeCoordinator *>(params);
+    xEventGroupWaitBits(instance->event_group, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
+    ESP_LOGI(TAG, "starting zigbee tasks");
+    xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, instance->event_group, tskIDLE_PRIORITY + 3, &instance->gateway_task_handle);
+    xEventGroupWaitBits(instance->event_group, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY); // wait that zigbee stack is initialized 
     instance->run(); 
 }
 
@@ -25,6 +28,7 @@ void ZigbeeCoordinator::run(){
     if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
     ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
     zigbee_event event;
+    int monitor = 0; 
 
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
@@ -32,6 +36,11 @@ void ZigbeeCoordinator::run(){
             auto plug = find_plug(event.ieee_address);
             //auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
             //smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
+            /*if(++monitor % 5 == 0) {
+                ESP_LOGW(TAG, "=== STACK MONITOR ==="); 
+                ESP_LOGW(TAG, "coordinator stack free: %d bytes", uxTaskGetStackHighWaterMark(task_handle));
+                ESP_LOGW(TAG, "gateway stack free: %d bytes", uxTaskGetStackHighWaterMark(gateway_task_handle));
+            }*/  
 
             switch (event.type) 
             {
@@ -184,6 +193,7 @@ void ZigbeeCoordinator::run(){
                 break;
             case ZIGBEE_EVENT_NETWORK_CLOSED:
                 ESP_LOGI(TAG, "Network close");
+                break;
             default:
                 ESP_LOGW(TAG, "unknown event type");
                 break;

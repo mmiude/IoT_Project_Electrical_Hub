@@ -21,7 +21,8 @@
 #include "string"
 
 #define WIFI_CONNECTED_BIT  BIT0
-#define WIFI_FAIL_BIT       BIT1
+#define WIFI_FAIL_BIT       BIT1 
+#define DEVICE_SIGN_READY   BIT2 
 
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
