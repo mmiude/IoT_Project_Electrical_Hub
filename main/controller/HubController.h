@@ -26,15 +26,13 @@ private:
     QueueHandle_t controller_queue; 
     
     TaskHandle_t handle; 
-    //QueueHandle_t controllerQueue;
-    //QueueHandle_t displayQueue; 
     std::map<uint64_t, deviceInfo> devices;
     
     float threshold_low;
     float threshold_medium; 
     float current_electricity_price; 
     
-
+    void handle_zigbee_events(controller_data &data); 
 };
 
 #endif //HUBCONTROLLER_H
