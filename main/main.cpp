@@ -27,6 +27,7 @@
 #include "device_sign.h"
 
 #include "HubController.h"
+#include "HubControllerEnums.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -43,13 +44,13 @@ extern "C" void app_main(void)
     IPStack ipstack(SSID, PW, wifi_eg);
 
     DeviceSign device_sign(&ipstack, wifi_eg);
-    static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
+    static QueueHandle_t controllerQueue = xQueueCreate(5, sizeof(controller_data));
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)
     };
 
-    static HubController controller(protocols, wifi_eg);
+    static HubController controller(protocols, wifi_eg, controllerQueue);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));

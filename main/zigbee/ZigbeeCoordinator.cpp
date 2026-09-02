@@ -1,4 +1,5 @@
 #include "ZigbeeCoordinator.h"
+#include "HubControllerEnums.h"
 #include <algorithm>
 
 static const char *TAG = "COORDINATOR"; 
@@ -28,7 +29,7 @@ void ZigbeeCoordinator::run(){
     if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
     ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
     zigbee_event event;
-    int monitor = 0; 
+    //int monitor = 0; 
 
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
@@ -54,6 +55,8 @@ void ZigbeeCoordinator::run(){
                         ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
                         read_electrical_measurement_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // should these be part of joining 
                         read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // part of joining?
+                        controller_data ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_JOIN};
+                        xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     } 
                 } else {
                      ESP_LOGI(TAG, "known plug rejoined");
