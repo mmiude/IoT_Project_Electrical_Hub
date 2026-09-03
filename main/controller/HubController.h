@@ -33,6 +33,13 @@ private:
     float current_electricity_price; 
     
     void handle_zigbee_events(controller_data &data); 
+    void check_low_thresholds();
+    void check_medium_thresholds();
+    void request_energy_consumption_values();
+    void request_electrical_values(); 
+
+    // calculate energy_consumption
+    // calculate price (or if these to can be together)
 };
 
 #endif //HUBCONTROLLER_H

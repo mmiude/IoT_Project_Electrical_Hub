@@ -35,6 +35,40 @@
 
 static const char *TAG = "MAIN"; 
 
+typedef struct {
+    QueueHandle_t q;
+    EventGroupHandle_t events;
+} dummy_task_params;
+
+void dummy_task(void *params) {
+
+    auto parameters = static_cast<dummy_task_params *> (params); 
+    QueueSetHandle_t q = parameters->q;
+    EventGroupHandle_t e = parameters->events;
+
+    controller_data fake_low_threshold = {.type = DATA_TYPE_THRESHOLD_LOW};
+    fake_low_threshold.data.threshold = 5.5;
+    
+    controller_data fake_med_threshold = {.type = DATA_TYPE_THRESHOLD_MED};
+    fake_med_threshold.data.threshold = 7.5; 
+
+    controller_data fake_electrical_price = {.type = DATA_TYPE_ELEC_PRICE};
+    fake_electrical_price.data.electricity_price = 6.9; 
+
+    xEventGroupWaitBits(e, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(10000));
+    xQueueSendToBack(q, &fake_low_threshold, 0);
+    xQueueSendToBack(q, &fake_med_threshold, 0);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    xQueueSendToBack(q, &fake_electrical_price, 0);
+
+    while (true) {
+        fake_electrical_price.data.electricity_price = (rand() % 70) / 1.0; 
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        xQueueSendToBack(q, &fake_electrical_price, 0);
+    }
+}
+
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -51,6 +85,10 @@ extern "C" void app_main(void)
     };
 
     static HubController controller(protocols, wifi_eg, controllerQueue);
+
+    static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
+
+    xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));

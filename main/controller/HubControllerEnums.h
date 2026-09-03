@@ -29,6 +29,10 @@ typedef enum {
     DATA_TYPE_VOLTAGE, 
     DATA_TYPE_CURRENT,
     DATA_TYPE_SET_ON,
+    DATA_TYPE_THRESHOLD_LOW,
+    DATA_TYPE_THRESHOLD_MED,
+    DATA_TYPE_PRIORITY,
+    DATA_TYPE_ELEC_PRICE
 } data_type_t;
 
 typedef struct controller_queue_info {
@@ -42,6 +46,9 @@ typedef struct controller_queue_info {
         float current;
         bool set_on;
         bool reporting_on;
+        float threshold;
+        int priority;
+        float electricity_price; 
     } data;
 
 } controller_data; 
