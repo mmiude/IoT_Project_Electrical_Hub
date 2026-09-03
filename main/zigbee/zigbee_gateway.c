@@ -220,6 +220,24 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
         }
         xQueueSend(event_queue, &event, 0);
     } break;
+    case EZB_NWK_SIGNAL_NETWORK_STATUS: 
+        const ezb_nwk_signal_network_status_params_t *params = ezb_app_signal_get_params(app_signal);
+        ESP_LOGI(TAG, "network status update: %d, short: 0%04hx: %s", params->status, params->network_addr, ezb_nwk_network_status_to_string(params->status));
+        switch (params->status){
+            case EZB_ZDO_UPDDEV_UNSECURE_JOIN:
+                ESP_LOGI(TAG, "unsecure join");
+                break;
+            case EZB_ZDO_UPDDEV_SECURE_REJOIN:
+                ESP_LOGI(TAG, "secure rejoin");
+                break;
+            case EZB_ZDO_UPDDEV_DEVICE_LEFT:
+                ESP_LOGI(TAG, "device left");
+                break;
+            default:
+                ESP_LOGI(TAG, "default in network signal status");
+                break;
+        }
+        break;
     default:
         ESP_LOGI(TAG, "Zigbee APP Signal: %s(type: 0x%02x)", ezb_app_signal_to_string(signal_type), signal_type); 
         break;

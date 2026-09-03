@@ -29,21 +29,21 @@ void HubController::run(){
             switch (ctrl_data.type) 
             {
             case DATA_TYPE_THRESHOLD_LOW:
-                ESP_LOGI(TAG, "new low threshold received.");
+                ESP_LOGI(TAG, "new low threshold received: %.2f.", ctrl_data.data.threshold);
                 threshold_low = ctrl_data.data.threshold;
                 check_low_thresholds();
                 break;
             case DATA_TYPE_THRESHOLD_MED:
-                ESP_LOGI(TAG, "new medium threshold received."); 
+                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.threshold); 
                 threshold_medium = ctrl_data.data.threshold;
                 check_medium_thresholds();
                 break; 
             case DATA_TYPE_ELEC_PRICE:
-                ESP_LOGI(TAG, "new electricity price received.");
+                ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.electricity_price);
                 current_electricity_price = ctrl_data.data.electricity_price;
-                request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
                 check_low_thresholds();
-                check_medium_thresholds(); 
+                check_medium_thresholds();
+                request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -133,11 +133,17 @@ void HubController::check_low_thresholds(){
     ESP_LOGI(TAG, "checking low threshold");
     if (current_electricity_price > threshold_low) {
         for (auto [key, value] : devices) {
-            if (value.priority == 1) plugProtocols.at(ZIGBEE)->set_plug_off(key); 
+            if (value.priority == 1){
+                plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                ESP_LOGW(TAG, "Turning priority level: 1 device off");
+            }
         }
     } else {
         for (auto [key, value] : devices) {
-            if (value.priority == 1) plugProtocols.at(ZIGBEE)->set_plug_on(key); 
+            if (value.priority == 1) {
+                plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                ESP_LOGW(TAG, "Turning priority level: 1 device on");
+            }
         }
     }
 }

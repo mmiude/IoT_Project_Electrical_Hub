@@ -63,8 +63,8 @@ void dummy_task(void *params) {
     xQueueSendToBack(q, &fake_electrical_price, 0);
 
     while (true) {
-        fake_electrical_price.data.electricity_price = (rand() % 70) / 1.0; 
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        fake_electrical_price.data.electricity_price = (rand() % 10) / 1.0; 
+        vTaskDelay(pdMS_TO_TICKS(30000));
         xQueueSendToBack(q, &fake_electrical_price, 0);
     }
 }
