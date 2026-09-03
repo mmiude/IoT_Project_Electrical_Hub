@@ -30,9 +30,6 @@
 #define API_HOSTNAME "192.168.101.105"
 #define API_PORT 3000
 
-
-
-
 bool get_efuse_mac(uint8_t *mac);
 
 class IPStack
@@ -43,9 +40,16 @@ private:
     static esp_err_t http_event_handler(esp_http_client_event_t *evt);
 
     EventGroupHandle_t eg;
+
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+
     // bool connected;
 public:
-    IPStack(const char *ssid, const char *pw, EventGroupHandle_t event_group);
+    IPStack(EventGroupHandle_t event_group);
+
+    bool connect_wifi(const char *ssid, const char *pw);
+    void disconnect_wifi();
 
     bool http_request(const char *hostname, int port, char *response_buff,
                     const char *path = "/", const char *query = "", const char *body_data = "",

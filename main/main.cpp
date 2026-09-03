@@ -40,8 +40,9 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
-    IPStack ipstack(SSID, PW, wifi_eg);
-
+    IPStack ipstack(wifi_eg);
+    ipstack.connect_wifi(SSID, PW);
+    
     DeviceSign device_sign(&ipstack, wifi_eg);
     static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
 
