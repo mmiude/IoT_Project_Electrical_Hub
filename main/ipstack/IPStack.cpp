@@ -228,6 +228,38 @@ esp_err_t IPStack::http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
+bool IPStack::call_http_request(t_http_request req)
+{
+    bool success = false;
+
+    switch (req.method)
+    {
+    case HTTP_METHOD_GET:
+        break;
+    case HTTP_METHOD_POST:
+        // esp_http_client_set_header(client, "Content-Type", "application/json");
+        esp_http_client_set_post_field(req.client, req.body_data, strlen(req.body_data));
+        break;
+    default:
+        break;
+    }
+
+    esp_err_t err = esp_http_client_perform(req.client);
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(req.client);
+        ESP_LOGI(TAG, "HTTP %d Status = %d, content_length = %" PRId64,
+                (int)req.method,
+                status_code,
+                esp_http_client_get_content_length(req.client));
+        success = status_code >= 200 && status_code < 300;
+    } else {
+        ESP_LOGE(TAG, "HTTP %d request failed: %s", (int)req.method, esp_err_to_name(err));
+    }
+    ESP_LOGI(TAG, "%s", req.response_buff);
+    ESP_ERROR_CHECK(esp_http_client_cleanup(req.client));
+    return success;
+}
+
 bool IPStack::http_request(const char *hostname, int port, char *response_buff,
                     const char *path, const char *query, const char *body_data,
                     esp_http_client_method_t method, std::map<std::string, std::string> headers)
@@ -242,8 +274,6 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
     config.user_data = response_buff;
     config.disable_auto_redirect = true;
 
-    bool success = false;
-
     ESP_LOGI(TAG, "HTTP %d %s", (int)method, hostname);
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -251,32 +281,39 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
         esp_http_client_set_header(client, key.c_str(), val.c_str());
     }
 
-    switch (method)
-    {
-    case HTTP_METHOD_GET:
-        break;
-    case HTTP_METHOD_POST:
-        // esp_http_client_set_header(client, "Content-Type", "application/json");
-        esp_http_client_set_post_field(client, body_data, strlen(body_data));
-        break;
-    default:
-        break;
-    }
-
-    esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG, "HTTP %d Status = %d, content_length = %" PRId64,
-                (int)method,
-                status_code,
-                esp_http_client_get_content_length(client));
-        success = status_code >= 200 && status_code < 300;
-    } else {
-        ESP_LOGE(TAG, "HTTP %d request failed: %s", (int)method, esp_err_to_name(err));
-    }
-    ESP_LOG_BUFFER_HEX(TAG, response_buff, strlen(response_buff));
-    ESP_ERROR_CHECK(esp_http_client_cleanup(client));
-    return success;
+    t_http_request req = {
+        .client = client,
+        .method = method,
+        .body_data = body_data,
+        .response_buff = response_buff
+    };
+    return call_http_request(req);
 }
 
-// bool IPStack::operator()() { return connected; }
+bool IPStack::http_request(const char *url, char *response_buff, const char *body_data,
+                    esp_http_client_method_t method,
+                    std::map<std::string, std::string> headers)
+{
+    esp_http_client_config_t config = {};
+    config.url = url;
+    config.method = method;
+    config.event_handler = http_event_handler;
+    config.user_data = response_buff;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.disable_auto_redirect = true;
+
+    ESP_LOGI(TAG, "HTTP %d %s", (int)method, url);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    for (auto const& [key, val] : headers) {
+        esp_http_client_set_header(client, key.c_str(), val.c_str());
+    }
+
+    t_http_request req = {
+        .client = client,
+        .method = method,
+        .body_data = body_data,
+        .response_buff = response_buff
+    };
+    return call_http_request(req);
+}
