@@ -144,44 +144,39 @@ esp_err_t IPStack::http_event_handler(esp_http_client_event_t *evt)
         //     break;
         case HTTP_EVENT_ON_DATA:
             ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            // Clean the buffer in case of a new request
+        
+            // Clean the buffer in case of a new request start
             if (output_len == 0 && evt->user_data) {
-                // we are just starting to copy the output data into the use
                 memset(evt->user_data, 0, MAX_HTTP_OUTPUT_BUFFER);
             }
-            /*
-             * Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-             * However, event handler can also be used in case chunked encoding is used.
-             */
-            if (!esp_http_client_is_chunked_response(evt->client)) {
-                // If user_data buffer is configured, copy the response into the buffer
-                int copy_len = 0;
-                if (evt->user_data) {
-                    // The last byte in evt->user_data is kept for the NULL character in case of out-of-bound access.
-                    copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
-                    if (copy_len) {
-                        // FIX 1: Cast void* to char* so the compiler knows how many bytes to offset
-                        memcpy((char *)evt->user_data + output_len, evt->data, copy_len);
-                    }
-                } else {
-                    int content_len = esp_http_client_get_content_length(evt->client);
+
+            // Process incoming body chunk regardless of whether transfer encoding is chunked
+            if (evt->user_data) {
+                int copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
+                if (copy_len > 0) {
+                    memcpy((char *)evt->user_data + output_len, evt->data, copy_len);
+                    output_len += copy_len;
+                    // Ensure null termination for safe string logging
+                    ((char *)evt->user_data)[output_len] = '\0';
+                }
+            } else {
+                int content_len = esp_http_client_get_content_length(evt->client);
+                if (output_buffer == NULL && content_len > 0) {
+                    output_buffer = (char *) calloc(content_len + 1, sizeof(char));
+                    output_len = 0;
                     if (output_buffer == NULL) {
-                        // We initialize output_buffer with 0 because it is used by strlen() and similar functions therefore should be null terminated.
-                        output_buffer = (char *) calloc(content_len + 1, sizeof(char));
-                        output_len = 0;
-                        if (output_buffer == NULL) {
-                            ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
-                            return ESP_FAIL;
-                        }
-                    }
-                    copy_len = MIN(evt->data_len, (content_len - output_len));
-                    if (copy_len) {
-                        memcpy(output_buffer + output_len, evt->data, copy_len);
+                        ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
+                        return ESP_FAIL;
                     }
                 }
-                output_len += copy_len;
+                if (output_buffer != NULL) {
+                    int copy_len = MIN(evt->data_len, (content_len - output_len));
+                    if (copy_len > 0) {
+                        memcpy(output_buffer + output_len, evt->data, copy_len);
+                        output_len += copy_len;
+                    }
+                }
             }
-
             break;
         case HTTP_EVENT_ON_FINISH:
             ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
@@ -238,25 +233,25 @@ bool IPStack::call_http_request(t_http_request req)
         break;
     case HTTP_METHOD_POST:
         // esp_http_client_set_header(client, "Content-Type", "application/json");
-        esp_http_client_set_post_field(req.client, req.body_data, strlen(req.body_data));
+        esp_http_client_set_post_field(*req.client, req.body_data, strlen(req.body_data));
         break;
     default:
         break;
     }
 
-    esp_err_t err = esp_http_client_perform(req.client);
+    esp_err_t err = esp_http_client_perform(*req.client);
     if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(req.client);
+        int status_code = esp_http_client_get_status_code(*req.client);
         ESP_LOGI(TAG, "HTTP %d Status = %d, content_length = %" PRId64,
                 (int)req.method,
                 status_code,
-                esp_http_client_get_content_length(req.client));
+                esp_http_client_get_content_length(*req.client));
         success = status_code >= 200 && status_code < 300;
     } else {
         ESP_LOGE(TAG, "HTTP %d request failed: %s", (int)req.method, esp_err_to_name(err));
     }
     ESP_LOGI(TAG, "%s", req.response_buff);
-    ESP_ERROR_CHECK(esp_http_client_cleanup(req.client));
+    ESP_ERROR_CHECK(esp_http_client_cleanup(*req.client));
     return success;
 }
 
@@ -282,7 +277,7 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
     }
 
     t_http_request req = {
-        .client = client,
+        .client = &client,
         .method = method,
         .body_data = body_data,
         .response_buff = response_buff
@@ -291,7 +286,7 @@ bool IPStack::http_request(const char *hostname, int port, char *response_buff,
 }
 
 bool IPStack::http_request(const char *url, char *response_buff, const char *body_data,
-                    esp_http_client_method_t method,
+                    const char *tls_cert, esp_http_client_method_t method,
                     std::map<std::string, std::string> headers)
 {
     esp_http_client_config_t config = {};
@@ -299,8 +294,13 @@ bool IPStack::http_request(const char *url, char *response_buff, const char *bod
     config.method = method;
     config.event_handler = http_event_handler;
     config.user_data = response_buff;
-    config.crt_bundle_attach = esp_crt_bundle_attach;
     config.disable_auto_redirect = true;
+
+    if (tls_cert == nullptr || tls_cert[0] == '\0') {
+        config.crt_bundle_attach = esp_crt_bundle_attach;
+    } else {
+        config.cert_pem = tls_cert;
+    }
 
     ESP_LOGI(TAG, "HTTP %d %s", (int)method, url);
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -310,7 +310,7 @@ bool IPStack::http_request(const char *url, char *response_buff, const char *bod
     }
 
     t_http_request req = {
-        .client = client,
+        .client = &client,
         .method = method,
         .body_data = body_data,
         .response_buff = response_buff
