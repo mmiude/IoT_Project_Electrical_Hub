@@ -60,6 +60,7 @@ public:
 
     bool connect_wifi(const char *ssid, const char *pw);
     void disconnect_wifi();
+    bool wait_for_wifi();
 
     bool http_request(const char *hostname, int port, char *response_buff,
                     const char *path = "/", const char *query = "", const char *body_data = "",

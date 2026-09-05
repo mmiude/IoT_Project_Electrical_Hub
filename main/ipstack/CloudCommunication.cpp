@@ -1,7 +1,39 @@
 #include "CloudCommunication.h"
 #include <sstream>
+#include <unordered_map>
+#include <optional>
+#include <cstdlib>
+#include <cerrno>
+#include <charconv>
 
 static const char *TAG = "CloudCommunication";
+
+static std::vector<std::string> split(const std::string& str, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::stringstream ss(str);
+
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
+    }
+
+    return tokens;
+}
+
+static std::optional<Commands> stringToCommand(const std::string& str) {
+    static const std::unordered_map<std::string, Commands> commandMap = {
+        { "TOGGLE_PLUG", Commands::TOGGLE_PLUG },
+        { "PLUG_ON", Commands::PLUG_ON },
+        { "PLUG_OFF", Commands::PLUG_OFF },
+        { "OPEN_NETWORK", Commands::OPEN_NETWORK }
+    };
+
+    auto it = commandMap.find(str);
+    if (it != commandMap.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
 
 CloudCommunication::CloudCommunication(IPStack *_ipstack,
     EventGroupHandle_t _wifi_eg, QueueHandle_t _tb_command_q)
@@ -14,17 +46,6 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack,
         tskIDLE_PRIORITY + 1, NULL);
 }
 
-bool CloudCommunication::wait_for_wifi()
-{
-    EventBits_t bits = xEventGroupWaitBits(wifi_eg,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-        pdFALSE,
-        pdFALSE,
-        portMAX_DELAY);
-
-    return bits & WIFI_CONNECTED_BIT;
-}
-
 void CloudCommunication::sign_task(void *param)
 {
     auto cloud_communication = static_cast<CloudCommunication *>(param);
@@ -32,7 +53,7 @@ void CloudCommunication::sign_task(void *param)
 
     char *pcName = pcTaskGetName(NULL);
 
-    if (cloud_communication->wait_for_wifi())
+    if (ipstack->wait_for_wifi())
     {
         uint8_t mac[6];
         if (!get_efuse_mac(mac)) {
@@ -92,7 +113,7 @@ void CloudCommunication::tb_read_command_task(void *param)
 
     char *pcName = pcTaskGetName(NULL);
 
-    while (cloud_communication->wait_for_wifi()) {
+    while (ipstack->wait_for_wifi()) {
         ESP_LOGI(TAG, "%s: Fetching tb command...", pcName);
 
         int url_size = std::snprintf(nullptr, 0, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
@@ -120,11 +141,77 @@ void CloudCommunication::tb_read_command_task(void *param)
             http_body.c_str(), THINGSPEAK_CERT, HTTP_METHOD_POST, tb_headers);
 
         if (success) {
-            ESP_LOGI(TAG, "%s: Yaaay", pcName);
+            HubCommand hc = {};
+            if (cloud_communication->parse_talkback_response_json(buffer, &hc)) {
+                ESP_LOGI(TAG, "%s: Succesfully parsed command\nCommand: %d\nDevice id: %" PRIu64,
+                    pcName, static_cast<int>(hc.command), hc.device_id);
+
+                if (xQueueSendToBack(cloud_communication->tb_command_q, &hc, portMAX_DELAY) == pdTRUE) {
+                    ESP_LOGI(TAG, "%s: Succesfully added command to queue", pcName);
+                } else {
+                    ESP_LOGE(TAG, "%s: Error adding command to queue", pcName);
+                }
+            } else {
+                ESP_LOGI(TAG, "%s: Error parsing command or no command in queue", pcName);
+            }
         } else {
             ESP_LOGE(TAG, "%s: Error :(", pcName);
         }
         free(buffer);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+bool CloudCommunication::parse_talkback_response_json(const char *response, HubCommand *hub_command)
+{
+    if (!response || !hub_command) return false;
+
+    jsmn_parser parser;
+    jsmn_init(&parser);
+
+    std::string response_str = response;
+
+    std::string json = "";
+    size_t json_start = response_str.find("{"); 
+    size_t json_end = response_str.rfind("}");
+    if (json_start == std::string::npos || json_end == std::string::npos) return false;
+
+    json = response_str.substr(json_start, json_end - json_start + 1);
+    jsmntok_t tokens[JSMN_TOKENS_SIZE];
+    int r = jsmn_parse(&parser, json.c_str(), json.size(), tokens, JSMN_TOKENS_SIZE);
+    if (r < 0) return false;
+
+    const char command[] = "HUB_COMMAND|";
+
+    for (int i = 0; i < JSMN_TOKENS_SIZE; i++) {
+        if (tokens[i].type == JSMN_STRING) {
+            std::string json_val = json.substr(tokens[i].start, tokens[i].end - tokens[i].start);
+            if (json_val.find(command) != std::string::npos) {
+                auto parsed_cmd = split(json_val.substr(strlen(command)), '|');
+                size_t cmd_size = parsed_cmd.size();
+
+                if (cmd_size < 1) return false;
+
+                auto command = stringToCommand(parsed_cmd[0]);
+                if (command.has_value()) {
+                    hub_command->command = command.value();
+                } else {
+                    return false;
+                }
+
+                if (cmd_size < 2) return true;
+
+                auto device_id_str = parsed_cmd[1];
+                uint64_t device_id = 0;
+                auto [ptr, ec] = std::from_chars(device_id_str.data(),
+                    device_id_str.data() + device_id_str.size(), device_id);
+                
+                if (ec == std::errc{}) {
+                    hub_command->device_id = device_id;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }

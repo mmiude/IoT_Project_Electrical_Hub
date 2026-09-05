@@ -8,7 +8,12 @@
 #include "jwt.h"
 #include "IPStack.h"
 
+#include <vector>
+
 #include "network_info.h"
+
+#define JSMN_STATIC
+#include "jsmn.h"
 
 #define THINGSPEAK_CERT "-----BEGIN CERTIFICATE-----\n\
 MIIDjjCCAnagAwIBAgIQAzrx5qcRqaC7KGSxHQn65TANBgkqhkiG9w0BAQsFADBh\n\
@@ -35,6 +40,19 @@ MrY=\n\
 
 #define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
 
+enum class Commands {
+    TOGGLE_PLUG,
+    PLUG_ON,
+    PLUG_OFF,
+    OPEN_NETWORK
+};
+
+typedef struct {
+    Commands command;
+    uint64_t device_id;
+} HubCommand;
+
+#define JSMN_TOKENS_SIZE 20
 
 class CloudCommunication
 {
@@ -44,10 +62,10 @@ private:
 
     QueueHandle_t tb_command_q;
 
-    bool wait_for_wifi();
-
     static void sign_task(void *param);
     static void tb_read_command_task(void *param);
+
+    bool parse_talkback_response_json(const char *response, HubCommand *hub_command);
 
 public:
     CloudCommunication(IPStack *_ipstack,

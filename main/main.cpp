@@ -43,10 +43,10 @@ extern "C" void app_main(void)
     IPStack ipstack(wifi_eg);
     ipstack.connect_wifi(SSID, PW);
 
-    static QueueHandle_t tb_command_q = xQueueCreate(10, 67); // not real item size
+    static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
     static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
 
-    CloudCommunication device_sign(&ipstack, wifi_eg, tb_command_q);
+    CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)

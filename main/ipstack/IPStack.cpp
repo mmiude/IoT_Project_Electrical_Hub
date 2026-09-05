@@ -20,6 +20,17 @@ IPStack::IPStack(EventGroupHandle_t event_group)
     instance_got_ip = nullptr;
 }
 
+bool IPStack::wait_for_wifi()
+{
+    EventBits_t bits = xEventGroupWaitBits(eg,
+        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+        pdFALSE,
+        pdFALSE,
+        portMAX_DELAY);
+
+    return bits & WIFI_CONNECTED_BIT;
+}
+
 bool IPStack::connect_wifi(const char *ssid, const char *pw)
 {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -50,24 +61,34 @@ bool IPStack::connect_wifi(const char *ssid, const char *pw)
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
-    EventBits_t bits = xEventGroupWaitBits(eg,
-        WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-        pdFALSE,
-        pdFALSE,
-        portMAX_DELAY);
-
-    if (bits & WIFI_CONNECTED_BIT) {
+    if (wait_for_wifi()) {
         ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                    ssid, pw);
+            ssid, pw);
         return true;
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                    ssid, pw);
-        return false;
-    } else {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
-        return false;
     }
+    ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+                ssid, pw);
+    return false;
+
+
+    // EventBits_t bits = xEventGroupWaitBits(eg,
+    //     WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+    //     pdFALSE,
+    //     pdFALSE,
+    //     portMAX_DELAY);
+
+    // if (bits & WIFI_CONNECTED_BIT) {
+    //     ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
+    //                 ssid, pw);
+    //     return true;
+    // } else if (bits & WIFI_FAIL_BIT) {
+    //     ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
+    //                 ssid, pw);
+    //     return false;
+    // } else {
+    //     ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    //     return false;
+    // }
 }
 
 void IPStack::disconnect_wifi()
