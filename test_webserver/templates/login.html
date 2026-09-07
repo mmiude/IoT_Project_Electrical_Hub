@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login with Google</title>
+  
+  <!-- Load Google Identity Services library (optional, for functionality) -->
+  <!-- <script src="https://accounts.google.com/gsi/client" async defer></script> -->
+
+  <style>
+    /* Reset margins and set full-height page body */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Roboto, Arial, sans-serif;
+      background-color: #f8f9fa;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Horizontally center content */
+    }
+
+    /* Container for the button with top gap */
+    .header-container {
+      margin-top: 40px; /* Gap between top of the page and the button */
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Custom styled Google Sign-In button */
+    .g-sign-in-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #ffffff;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+      transition: background-color 0.2s, box-shadow 0.2s;
+    }
+
+    .g-sign-in-button:hover {
+      background-color: #f7f8f8;
+      box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+    }
+
+    .g-sign-in-button:active {
+      background-color: #eeeeee;
+    }
+
+    /* Google G Logo SVG */
+    .google-icon {
+      width: 18px;
+      height: 18px;
+      margin-right: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-container">
+    <!-- Custom Google Button -->
+    <a class="g-sign-in-button" href="/auth/google">
+      <svg class="google-icon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M17.64 9.2c0-.74-.06-1.28-.19-1.84H9v3.34h4.96c-.1.83-.64 2.08-1.84 2.92l2.84 2.2c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.84-2.2c-.76.53-1.78.9-3.12.9-2.38 0-4.41-1.57-5.13-3.72L.97 13.01C2.47 15.98 5.48 18 9 18z"/>
+        <path fill="#FBBC05" d="M3.87 10.8c-.2-.58-.32-1.2-.32-1.8s.12-1.22.32-1.8L.97 4.99C.35 6.22 0 7.57 0 9s.35 2.78.97 4.01l2.9-2.21z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.47 2.02.97 4.99l2.9 2.21C4.59 5.05 6.62 3.58 9 3.58z"/>
+      </svg>
+      <span>Sign in with Google</span>
+    </a>
+  </div>
+
+  <!-- <script>
+    function handleGoogleLogin() {
+      alert("Login with Google button clicked!");
+      // Add your Google authentication logic here
+    }
+  </script> -->
+
+</body>
+</html>

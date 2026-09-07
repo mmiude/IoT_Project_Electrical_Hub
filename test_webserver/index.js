@@ -2,10 +2,17 @@ const express = require("express")
 const jwt = require('jsonwebtoken');
 const postgres = require("postgres")
 const path = require("path")
+const cookieParser = require("cookie-parser")
 const deviceSign = require("./deviceSign")
+
+const authenticationRoutes = require("./routes/auth.routes")
+
+const googleOauth = require("./services/google/googleOauth")
 
 const app = express()
 app.use(express.json());
+app.use(cookieParser())
+app.use("/auth", authenticationRoutes)
 
 const sql = postgres({
     host: "localhost",
@@ -37,12 +44,22 @@ async function create_hub(hub_id, signature) {
     `
 }
 
+
 app.get("/", (req, res) => {
-    res.send("Hello world: " + req.query.id)
+    res.redirect("/login")
+    // res.send("Hello world: " + req.query.id)
 })
 
+app.get("/login", (req, res) => {
+    res.sendFile(path.resolve("./templates/login.html"))
+})
+// app.get("/googleLogin", (req, res) => {
+//     res.status(301).redirect(googleOauth.getGoogleOauthUrl())
+// })
+app.get("")
+
 app.get("/register_hub", (req, res) => {
-    res.sendFile(path.resolve("./index.html"))
+    res.sendFile(path.resolve("./templates/register_hub.html"))
 })
 app.post("/register_hub/:id", async (req, res) => {
     const { id } = req.params

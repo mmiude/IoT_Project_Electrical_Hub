@@ -11,7 +11,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
     "postgres": "^3.4.9"
   }
