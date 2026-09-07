@@ -34,7 +34,7 @@
 bool get_efuse_mac(uint8_t *mac);
 
 typedef struct {
-    esp_http_client_handle_t client;
+    esp_http_client_handle_t *client;
     esp_http_client_method_t method;
     const char *body_data;
     char *response_buff;
@@ -60,6 +60,7 @@ public:
 
     bool connect_wifi(const char *ssid, const char *pw);
     void disconnect_wifi();
+    bool wait_for_wifi();
 
     bool http_request(const char *hostname, int port, char *response_buff,
                     const char *path = "/", const char *query = "", const char *body_data = "",
@@ -67,7 +68,7 @@ public:
                     std::map<std::string, std::string> headers = {});
 
     bool http_request(const char *url, char *response_buff, const char *body_data = "",
-                    esp_http_client_method_t method = HTTP_METHOD_GET,
+                    const char *tls_cert = "", esp_http_client_method_t method = HTTP_METHOD_GET,
                     std::map<std::string, std::string> headers = {});
     
     // bool operator()();
