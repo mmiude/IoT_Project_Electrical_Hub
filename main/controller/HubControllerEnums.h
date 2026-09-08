@@ -14,6 +14,8 @@ typedef struct device_info {
     bool on{};
     bool online{};
     bool automation_on{};
+    bool support_energy_consumption{};
+    bool reporting_on{};
     float power{};
     float energy_consumption{};
     float current{};
@@ -34,6 +36,7 @@ typedef enum {
     DATA_TYPE_THRESHOLD_MED,
     DATA_TYPE_PRIORITY,
     DATA_TYPE_ELEC_PRICE,
+    DATA_TYPE_SUPPORTS_METERING,
     DATA_TYPE_REQUEST_ELEC_VALUES
 } data_type_t;
 
@@ -47,7 +50,7 @@ typedef struct controller_queue_info {
         float voltage;
         float current;
         bool set_on;
-        bool reporting_on;
+        bool supports;
         float threshold;
         int priority;
         float electricity_price; 

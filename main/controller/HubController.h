@@ -40,6 +40,7 @@ private:
     void request_energy_consumption_values();
     void request_electrical_values(); 
     void check_device_aliveness(); 
+    void check_on_off_state(); 
 
     // calculate energy_consumption
     // calculate price (or if these to can be together)

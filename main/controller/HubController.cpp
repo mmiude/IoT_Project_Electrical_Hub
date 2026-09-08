@@ -52,6 +52,7 @@ void HubController::run(){
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
                 request_electrical_values();
+                check_on_off_state();
                 check_device_aliveness(); 
                 break;
             default:
@@ -131,7 +132,17 @@ void HubController::handle_zigbee_events(controller_data &data){
         }
         break;
     case DATA_TYPE_REPORTING:
-        // automatic reporting about on/off state 
+        if (dev != nullptr) {
+            dev->reporting_on = data.data.supports;
+            ESP_LOGI(TAG, "supports reporting %s", data.data.supports ? "YES" : "NO");
+        }
+        break;
+    case DATA_TYPE_SUPPORTS_METERING:
+        if (dev != nullptr){
+            dev->support_energy_consumption = data.data.supports;
+            ESP_LOGI(TAG, "supports energy consumption %s", data.data.supports ? "YES" : "NO");
+            // send to ui 
+        }
         break;
     default:
         break;
@@ -175,7 +186,7 @@ void HubController::check_medium_thresholds(){
 void HubController::request_energy_consumption_values(){
     ESP_LOGI(TAG, "requesting energy consumption");
     for (auto [key, value] : devices) {
-        plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
+        if (value.support_energy_consumption) plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -194,5 +205,14 @@ void HubController::check_device_aliveness(){
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             dev.online = false;
         } else dev.online = true; 
+    }
+}
+
+void HubController::check_on_off_state(){
+    for (auto& [key, dev] : devices) {
+        if (!dev.reporting_on) {
+            plugProtocols.at(ZIGBEE)->request_on_off_state(key);
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
     }
 }

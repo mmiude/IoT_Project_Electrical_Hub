@@ -169,6 +169,9 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_SUMMATION_MULTIPLIER:
                 if (plug) {
                     plug->summation_multiplier = event.data.summation_multiplier;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING};
+                    ctrl_data.data.supports = true;
+                    xQueueSend(controller_queue, &ctrl_data, 0);
                     plug->supports_metering = true;
                 } else ESP_LOGW(TAG, "summation multiplier from unkown smart plug");
                 break;
@@ -181,6 +184,9 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR:
                 if (plug) {
                     if (event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_DIVISOR_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_MULTIPLIER_ID) {
+                        ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING};
+                        ctrl_data.data.supports = false;
+                        xQueueSend(controller_queue, &ctrl_data, 0);
                         plug->supports_metering = false;
                     } 
                     else if (event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID) {
@@ -192,13 +198,18 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_STATE_REPORTING_SUCCESS:
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to true", plug->short_addr);
-                    plug->automatic_state_reporting = true;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING};
+                    ctrl_data.data.supports = true;
+                    xQueueSend(controller_queue, &ctrl_data, 0);
+                    //plug->automatic_state_reporting = true;
                 } else ESP_LOGW(TAG, "unknown plug sent state reporting successful signal");
                 break;
             case ZIGBEE_EVENT_STATE_REPORTING_ERROR:
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to false", plug->short_addr);
-                    plug->automatic_state_reporting = false;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING};
+                    ctrl_data.data.supports = false;
+                    xQueueSend(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
                 break; 
             case ZIGBEE_EVENT_NETWORK_OPEN:
@@ -218,7 +229,7 @@ void ZigbeeCoordinator::run(){
 // public methods - accessed via IDeviceProtocol interface 
 void ZigbeeCoordinator::request_energy_consumption_values(uint64_t device_id){
     auto plug = find_plug(device_id);
-    if (plug) {
+    if (plug && plug->supports_metering) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
         read_energy_consumption_value(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
