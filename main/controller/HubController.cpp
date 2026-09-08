@@ -24,8 +24,9 @@ void HubController::dataRequestTimerCallback(TimerHandle_t xTimer){
 void HubController::run(){
     ESP_LOGI(TAG, "Starting hub controller task...");
     xTimerStart(timer_handle, 0);
-    controller_data ctrl_data; 
-
+    TickType_t last_check = xTaskGetTickCount();
+    controller_data ctrl_data;
+    
     while (true) {
 
         if (xQueueReceive(controller_queue, &ctrl_data, portMAX_DELAY) == pdPASS) {
@@ -48,19 +49,16 @@ void HubController::run(){
                 check_medium_thresholds();
                 request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
                 break;
-            case DATA_TYPE_REQUEST_ELEC_VALUES:
+            case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
                 request_electrical_values();
+                check_device_aliveness(); 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
                 break;
             }
         } 
-        //somehow check if measurements have not been updated in specific amount of time -> request these -> maybe with timer? 
-        // 
-        // TODO: add timestamps to events from coordinator side -> have a function where we check that we have received responses from plugs in some time period -> online/offline update -> maybe check with software timer IF possible 
-        // TODO: what do we do in case of wi-fi connection loss? 
     }
 }
 
@@ -72,7 +70,11 @@ void HubController::handle_zigbee_events(controller_data &data){
     switch(data.type)
     {
     case DATA_TYPE_DEVICE_JOIN:
-        devices.emplace(data.device_id, device_info{.priority = 1});
+        devices.emplace(data.device_id, device_info{
+            .priority = 1,
+            .online = true,
+            .last_seen = xTaskGetTickCount(), 
+        });
         ESP_LOGI(TAG, "New device received by Hub");
         // send to ui 
         break;
@@ -83,7 +85,8 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
-            dev->power = data.data.power; 
+            dev->power = data.data.power;
+            dev->last_seen = xTaskGetTickCount(); 
             ESP_LOGI(TAG, "Power update %.2f", data.data.power);
             //send to ui
         }  
@@ -91,6 +94,7 @@ void HubController::handle_zigbee_events(controller_data &data){
     case DATA_TYPE_ENERGY:
         if (dev != nullptr) {
             dev->energy_consumption = data.data.energy_consumption;
+            dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "Energy update %.2f", data.data.energy_consumption);
             //send to ui 
         } 
@@ -98,6 +102,7 @@ void HubController::handle_zigbee_events(controller_data &data){
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
             dev->current = data.data.current;
+            dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "Current update %.2f", data.data.current);
             //only cloud 
         } 
@@ -105,6 +110,7 @@ void HubController::handle_zigbee_events(controller_data &data){
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
             dev->voltage = data.data.current;
+            dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "voltage update %.2f", data.data.voltage);
             //only cloud
         }  
@@ -112,8 +118,9 @@ void HubController::handle_zigbee_events(controller_data &data){
     case DATA_TYPE_SET_ON:
         if (dev != nullptr) {
             dev->on = data.data.set_on;
+            dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "on/off state update %s", data.data.set_on ? "ON" : "OFF");
-            // if on -> ask electrical values -> off power 0 
+            if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
             //send to ui 
         }  
         break;
@@ -178,5 +185,14 @@ void HubController::request_electrical_values(){
     for (auto [key, value] : devices) {
         plugProtocols.at(ZIGBEE)->request_electrical_values(key);
         vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+void HubController::check_device_aliveness(){
+    for (auto& [key, dev] : devices) {
+        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
+            ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
+            dev.online = false;
+        } else dev.online = true; 
     }
 }

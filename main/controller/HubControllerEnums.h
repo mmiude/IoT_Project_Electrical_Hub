@@ -10,14 +10,15 @@ enum ProtocolIndex {
 };
 
 typedef struct device_info {
-    std::string device_name{}; 
     int priority{};
     bool on{};
-    bool online{}; 
+    bool online{};
+    bool automation_on{};
     float power{};
     float energy_consumption{};
     float current{};
     float voltage{};
+    TickType_t last_seen{};
 } deviceInfo;
 
 typedef enum {

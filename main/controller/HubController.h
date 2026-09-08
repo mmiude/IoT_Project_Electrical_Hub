@@ -39,6 +39,7 @@ private:
     void check_medium_thresholds();
     void request_energy_consumption_values();
     void request_electrical_values(); 
+    void check_device_aliveness(); 
 
     // calculate energy_consumption
     // calculate price (or if these to can be together)
