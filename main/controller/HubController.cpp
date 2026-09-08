@@ -1,7 +1,5 @@
 #include "HubController.h"
 
-//#include "zigbee_gateway.h"
-#define ELECTRICITY_PRICE_UPDATE_INTERVAL 900000
 
 static const char *TAG = "HUB_CONTROLLER"; 
 
@@ -20,12 +18,9 @@ void HubController::run(){
     ESP_LOGI(TAG, "Starting hub controller task...");
     controller_data ctrl_data; 
 
-    TickType_t current_ticks = xTaskGetTickCount(); 
-    TickType_t tick_interval = pdMS_TO_TICKS(30000);
-
     while (true) {
 
-        if (xQueueReceive(controller_queue, &ctrl_data, pdMS_TO_TICKS(ELECTRICITY_PRICE_UPDATE_INTERVAL)) == pdPASS) {
+        if (xQueueReceive(controller_queue, &ctrl_data, pdMS_TO_TICKS(15000)) == pdPASS) {
             switch (ctrl_data.type) 
             {
             case DATA_TYPE_THRESHOLD_LOW:
@@ -49,15 +44,11 @@ void HubController::run(){
                 handle_zigbee_events(ctrl_data);
                 break;
             }
-            
-        } else {
-            ESP_LOGW(TAG, "here we do some safety measures if we do not receive new electricity price on time...");
         }
+        //somehow check if measurements have not been updated in specific amount of time -> request these
         // 
         // TODO: add timestamps to events from coordinator side -> have a function where we check that we have received responses from plugs in some time period -> online/offline update -> maybe check with software timer IF possible 
         // TODO: what do we do in case of wi-fi connection loss? 
-
-
     }
 }
 
@@ -110,7 +101,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr) {
             dev->on = data.data.set_on;
             ESP_LOGI(TAG, "on/off state update %s", data.data.set_on ? "ON" : "OFF");
-            if (dev->on) request_electrical_values(); 
+            if (dev->on) request_electrical_values(); // request values only from specific device which have been turned on
             // if on -> ask electrical values -> off power 0 
             //send to ui 
         }  
