@@ -5,6 +5,7 @@ static const char *TAG = "HUB_CONTROLLER";
 
 
 HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q) : plugProtocols(protocols), event_group(events), controller_queue(controller_q){
+    timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(15000), pdTRUE, this, dataRequestTimerCallback);
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
 
@@ -14,13 +15,20 @@ void HubController::runner(void *params){
     instance->run();
 }
 
+void HubController::dataRequestTimerCallback(TimerHandle_t xTimer){
+    auto instance = static_cast<HubController *>(pvTimerGetTimerID(xTimer));
+    controller_data ctrl_data = {.device_id = 0, .type = DATA_TYPE_REQUEST_ELEC_VALUES}; 
+    xQueueSendToBack(instance->controller_queue, &ctrl_data, 0);
+}
+
 void HubController::run(){
     ESP_LOGI(TAG, "Starting hub controller task...");
+    xTimerStart(timer_handle, 0);
     controller_data ctrl_data; 
 
     while (true) {
 
-        if (xQueueReceive(controller_queue, &ctrl_data, pdMS_TO_TICKS(15000)) == pdPASS) {
+        if (xQueueReceive(controller_queue, &ctrl_data, portMAX_DELAY) == pdPASS) {
             switch (ctrl_data.type) 
             {
             case DATA_TYPE_THRESHOLD_LOW:
@@ -40,12 +48,16 @@ void HubController::run(){
                 check_medium_thresholds();
                 request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
                 break;
+            case DATA_TYPE_REQUEST_ELEC_VALUES:
+                ESP_LOGI(TAG, "requesting electrical values.");
+                request_electrical_values();
+                break;
             default:
                 handle_zigbee_events(ctrl_data);
                 break;
             }
-        }
-        //somehow check if measurements have not been updated in specific amount of time -> request these
+        } 
+        //somehow check if measurements have not been updated in specific amount of time -> request these -> maybe with timer? 
         // 
         // TODO: add timestamps to events from coordinator side -> have a function where we check that we have received responses from plugs in some time period -> online/offline update -> maybe check with software timer IF possible 
         // TODO: what do we do in case of wi-fi connection loss? 
@@ -101,7 +113,6 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr) {
             dev->on = data.data.set_on;
             ESP_LOGI(TAG, "on/off state update %s", data.data.set_on ? "ON" : "OFF");
-            if (dev->on) request_electrical_values(); // request values only from specific device which have been turned on
             // if on -> ask electrical values -> off power 0 
             //send to ui 
         }  
@@ -144,10 +155,12 @@ void HubController::check_medium_thresholds(){
     if (current_electricity_price > threshold_medium) {
         for (auto [key, value] : devices) {
             if (value.priority == 2) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     } else {
         for (auto [key,value] : devices) {
-            if (value.priority == 2) plugProtocols.at(ZIGBEE)->set_plug_on(key); 
+            if (value.priority == 2) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 }
@@ -156,12 +169,14 @@ void HubController::request_energy_consumption_values(){
     ESP_LOGI(TAG, "requesting energy consumption");
     for (auto [key, value] : devices) {
         plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 void HubController::request_electrical_values(){
     ESP_LOGI(TAG, "reqeusting electrical values"); 
     for (auto [key, value] : devices) {
-        plugProtocols.at(ZIGBEE)->request_electrical_values(key); 
+        plugProtocols.at(ZIGBEE)->request_electrical_values(key);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

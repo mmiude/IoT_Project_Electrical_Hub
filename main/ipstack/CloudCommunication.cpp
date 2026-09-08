@@ -48,6 +48,7 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack,
 
 void CloudCommunication::sign_task(void *param)
 {
+    ESP_LOGW(TAG, "starting sign_task.");
     auto cloud_communication = static_cast<CloudCommunication *>(param);
     auto ipstack = cloud_communication->ipstack;
 
@@ -112,6 +113,8 @@ void CloudCommunication::tb_read_command_task(void *param)
     auto ipstack = cloud_communication->ipstack;
 
     char *pcName = pcTaskGetName(NULL);
+
+    xEventGroupWaitBits(cloud_communication->wifi_eg, WIFI_CONNECTED_BIT, pdFALSE, pdFALSE, portMAX_DELAY); // DELETE BEFORE MERGING MAIN
 
     while (ipstack->wait_for_wifi()) {
         ESP_LOGI(TAG, "%s: Fetching tb command...", pcName);

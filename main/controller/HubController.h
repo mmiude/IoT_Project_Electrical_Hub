@@ -18,6 +18,7 @@ public:
     HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q); 
 
 private:
+    static void dataRequestTimerCallback(TimerHandle_t xTimer); 
     static void runner(void *params);
     void run();
 
@@ -26,6 +27,7 @@ private:
     QueueHandle_t controller_queue; 
     
     TaskHandle_t handle; 
+    TimerHandle_t timer_handle;
     std::map<uint64_t, deviceInfo> devices;
     
     float threshold_low;

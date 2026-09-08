@@ -78,10 +78,8 @@ extern "C" void app_main(void)
     IPStack ipstack(wifi_eg);
     ipstack.connect_wifi(SSID, PW);
 
-    DeviceSign device_sign(&ipstack, wifi_eg);
     static QueueHandle_t controllerQueue = xQueueCreate(5, sizeof(controller_data));
     static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
-    static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
 

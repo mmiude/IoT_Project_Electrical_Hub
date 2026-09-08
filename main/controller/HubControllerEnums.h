@@ -32,7 +32,8 @@ typedef enum {
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,
     DATA_TYPE_PRIORITY,
-    DATA_TYPE_ELEC_PRICE
+    DATA_TYPE_ELEC_PRICE,
+    DATA_TYPE_REQUEST_ELEC_VALUES
 } data_type_t;
 
 typedef struct controller_queue_info {
