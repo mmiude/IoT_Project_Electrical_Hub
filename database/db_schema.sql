@@ -25,7 +25,8 @@ CREATE TABLE "hub_user"(
     "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "name" VARCHAR(255) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
-    "hub_id" VARCHAR(255) NOT NULL,
+    "profile_picture" VARCHAR(255),
+    "hub_id" VARCHAR(255),
     CONSTRAINT "hub_user_hub_id_foreign" FOREIGN KEY ("hub_id") REFERENCES "hub"("id")
 );
 
