@@ -5,7 +5,7 @@ dotenv.config();
 const refreshTokenCookieOptions = {
     maxAge: 3.154e10,
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'lax',
     secure: false,
 };
 

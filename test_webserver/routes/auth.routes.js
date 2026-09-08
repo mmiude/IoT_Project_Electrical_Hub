@@ -1,15 +1,13 @@
 const express = require("express")
-const googleOauth = require("../services/google/googleOauth")
+const googleOauth = require("../services/google/googleOauth");
+const { googleOauthHandler } = require("../handlers/auth/googleOauth.handler");
 
 const authenticationRoutes = express.Router();
 
 authenticationRoutes
     .get("/google", (req, res) => {
-        res.status(301).redirect(googleOauth.getGoogleOauthUrl())
+        res.redirect(googleOauth.getGoogleOauthUrl())
     })
-    .get("/sessions/oauth/google", async (req, res) => {
-        await googleOauth.getGoogleOauthTokens(req.query.code)
-        res.send("yaaah")
-    })
+    .get("/sessions/oauth/google", googleOauthHandler)
 
 module.exports = authenticationRoutes

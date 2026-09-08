@@ -12,6 +12,7 @@ const config = {
     dbPassword: process.env.DB_PASSWORD,
     accessTokenTtl: '30m',
     refreshTokenTtl: '1y',
+    jwtSecret: process.env.JWT_SECRET
 }
 
 module.exports = config
