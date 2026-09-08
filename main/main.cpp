@@ -24,7 +24,7 @@
 #include "IPStack.h"
 
 #include "jwt.h"
-#include "device_sign.h"
+#include "CloudCommunication.h"
 
 #include "HubController.h"
 #include "HubControllerEnums.h"
@@ -75,10 +75,15 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
-    IPStack ipstack(SSID, PW, wifi_eg);
+    IPStack ipstack(wifi_eg);
+    ipstack.connect_wifi(SSID, PW);
 
     DeviceSign device_sign(&ipstack, wifi_eg);
     static QueueHandle_t controllerQueue = xQueueCreate(5, sizeof(controller_data));
+    static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
+    static QueueHandle_t controllerQueue = xQueueCreate(3, sizeof(int));
+
+    CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)
