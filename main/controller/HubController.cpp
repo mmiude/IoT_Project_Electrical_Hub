@@ -24,7 +24,6 @@ void HubController::dataRequestTimerCallback(TimerHandle_t xTimer){
 void HubController::run(){
     ESP_LOGI(TAG, "Starting hub controller task...");
     xTimerStart(timer_handle, 0);
-    TickType_t last_check = xTaskGetTickCount();
     controller_data ctrl_data;
     
     while (true) {
@@ -49,9 +48,7 @@ void HubController::run(){
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
-                check_low_thresholds();
-                check_medium_thresholds();
-                request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
+                check_thresholds();
                 break;
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
@@ -79,7 +76,8 @@ void HubController::handle_zigbee_events(controller_data &data){
         devices.emplace(data.device_id, device_info{
             .priority = 1, // this will be taken off
             .online = true,
-            .last_seen = xTaskGetTickCount(), 
+            .periodic_check_count = 0,
+            .last_seen = xTaskGetTickCount(),
         });
         ESP_LOGI(TAG, "New device received by Hub");
         // send to ui 
@@ -150,43 +148,55 @@ void HubController::handle_zigbee_events(controller_data &data){
 
 void HubController::check_low_thresholds(){
     ESP_LOGI(TAG, "checking low threshold");
-    if (current_electricity_price > threshold_low) {
-        for (auto [key, value] : devices) {
-            if (value.priority == 1){
-                plugProtocols.at(ZIGBEE)->set_plug_off(key);
-                ESP_LOGW(TAG, "Turning priority level: 1 device off");
+    for (auto &[key, dev] : devices) {
+        if (dev.priority == 1) {
+            if (current_electricity_price > threshold_low) {
+                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+            } else {
+                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
             }
-        }
-    } else {
-        for (auto [key, value] : devices) {
-            if (value.priority == 1) {
-                plugProtocols.at(ZIGBEE)->set_plug_on(key);
-                ESP_LOGW(TAG, "Turning priority level: 1 device on");
-            }
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 }
 
 void HubController::check_medium_thresholds(){
-    ESP_LOGI(TAG, "chekcing med threshold");
-    if (current_electricity_price > threshold_medium) {
-        for (auto [key, value] : devices) {
-            if (value.priority == 2) plugProtocols.at(ZIGBEE)->set_plug_off(key);
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-    } else {
-        for (auto [key,value] : devices) {
-            if (value.priority == 2) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+    ESP_LOGI(TAG, "checking med threshold");
+    for (auto &[key, dev] : devices) {
+        if (dev.priority == 2) {
+            if (current_electricity_price > threshold_medium) {
+                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+            } else {
+                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+            }
             vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 }
 
-void HubController::request_energy_consumption_values(){
-    ESP_LOGI(TAG, "requesting energy consumption");
-    for (auto [key, value] : devices) {
-        if (value.support_energy_consumption) plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
-        vTaskDelay(pdMS_TO_TICKS(10));
+void HubController::check_thresholds(){
+    ESP_LOGI(TAG, "checking both thresholds");
+
+    for (auto &[key, dev] : devices) {
+        if (dev.priority == 2) {
+            if (current_electricity_price > threshold_medium) {
+                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+            } else {
+                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        
+        else if (dev.priority == 1) {
+            if (current_electricity_price > threshold_low) {
+                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+            } else {
+                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+            }
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        else ESP_LOGI(TAG, "higher priority level device then 2. Not effected by thresholds.");
     }
 }
 
@@ -221,11 +231,21 @@ void HubController::periodic_device_check(){
     ESP_LOGI(TAG, "periodic device check");
     
     for (auto& [key, dev] : devices) {
+        ++dev.periodic_check_count;
         // request electrical values.
         plugProtocols.at(ZIGBEE)->request_electrical_values(key);
 
+        vTaskDelay(pdMS_TO_TICKS(5)); // small delay between requests so Zigbee network won't get angry. 
+
         // request plug state if reporting is not on for some reason.
         if (!dev.reporting_on) plugProtocols.at(ZIGBEE)->request_on_off_state(key);
+
+        // request energy consumption valuse every 5 mins
+        if (dev.periodic_check_count > 20 && dev.support_energy_consumption){ 
+            ESP_LOGI(TAG, "requesting energy consumption values");
+            plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
+            dev.periodic_check_count = 0; 
+        } 
         
         // aliveness check
         if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {

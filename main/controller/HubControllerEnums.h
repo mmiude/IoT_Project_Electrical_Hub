@@ -27,6 +27,7 @@ typedef struct device_info {
     float current{};
     float voltage{};
     float energy_consumption{};
+    int periodic_check_count{};
     TickType_t last_seen{};
 } deviceInfo;
 

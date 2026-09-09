@@ -37,12 +37,10 @@ private:
     void handle_zigbee_events(controller_data &data); 
     void check_low_thresholds();
     void check_medium_thresholds();
-    void request_energy_consumption_values();
+    void check_thresholds(); 
     void command_handler(controller_data &data);
     void periodic_device_check();
 
-    // calculate energy_consumption
-    // calculate price (or if these to can be together)
 };
 
 #endif //HUBCONTROLLER_H
