@@ -77,6 +77,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         devices.emplace(data.device_id, device_info{
             .priority = 0, // this will be taken off
             .online = true,
+            .automation_on = true,
             .periodic_check_count = 0,
             .last_seen = xTaskGetTickCount(),
         });
@@ -125,7 +126,8 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->on = data.data.flag;
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
-            if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
+            if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id); 
+            //if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
             xQueueSendToBack(ui_queue, &data, 0);
         }  
         break;
@@ -146,6 +148,18 @@ void HubController::handle_zigbee_events(controller_data &data){
         ESP_LOGE(TAG, "Controller received unknown zigbee data type."); 
         break;
     }
+}
+
+bool HubController::threshold_allows_opening(int priority) {
+    if (priority == 1) {
+        if (current_electricity_price > threshold_low) return false;
+        else return true;
+    } 
+    else if (priority == 2) {
+        if (current_electricity_price > threshold_medium) return false;
+        else return true;
+    }
+    return true;   
 }
 
 void HubController::check_low_thresholds(){
@@ -177,23 +191,35 @@ void HubController::check_medium_thresholds(){
 }
 
 void HubController::check_thresholds(){
-    ESP_LOGI(TAG, "checking both thresholds");
+    ESP_LOGI(TAG, "checking both thresholds. elec price: %.2f, low: %.2f, med: %.2f", current_electricity_price, threshold_low, threshold_medium);
 
     for (auto &[key, dev] : devices) {
         if (dev.priority == 2) {
             if (current_electricity_price > threshold_medium) {
-                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                if (dev.on){
+                    plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                    ESP_LOGI(TAG, "setting plug off on threshold check.");
+                } 
             } else {
-                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                if (!dev.on){
+                    plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                    ESP_LOGI(TAG, "setting plug on on threshold check");
+                } 
             }
             vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         else if (dev.priority == 1) {
             if (current_electricity_price > threshold_low) {
-                if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                if (dev.on) {
+                    plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                    ESP_LOGI(TAG, "setting plug off on threshold check");
+                } 
             } else {
-                if (!dev.on) plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                if (!dev.on){
+                    plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                    ESP_LOGI(TAG, "setting plug on on threshold check");
+                } 
             }
             vTaskDelay(pdMS_TO_TICKS(10));
         }
