@@ -51,7 +51,9 @@ typedef enum {
     // commands coming from ui side
     DATA_TYPE_COMMAND,
     // internal for controller - periodic info request from plugs
-    DATA_TYPE_REQUEST_ELEC_VALUES
+    DATA_TYPE_REQUEST_ELEC_VALUES,
+    // for ui to recieve online info
+    DATA_TYPE_ONLINE_STATE
 } data_type_t;
 
 typedef struct controller_queue_info {

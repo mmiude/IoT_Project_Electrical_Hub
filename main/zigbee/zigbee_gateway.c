@@ -114,7 +114,7 @@ static void zdo_find_smart_plug_device_result(const ezb_zdo_match_desc_req_resul
         }
     } else {
         ESP_LOGE(TAG, "Failed to find smart plug device in the network with error(0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = ieee_addr};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = ieee_addr, .data.device_joining = {.short_addr = (uint16_t)(uintptr_t) user_ctx, .endpoint = 0}};
         xQueueSend(event_queue, &event, 0);
     }
 }

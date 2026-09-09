@@ -15,7 +15,7 @@
 
 class HubController {
 public:
-    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q); 
+    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q); 
 
 private:
     static void dataRequestTimerCallback(TimerHandle_t xTimer); 
@@ -24,7 +24,9 @@ private:
 
     std::vector<std::shared_ptr<IDeviceProtocol>> plugProtocols;
     EventGroupHandle_t event_group;
-    QueueHandle_t controller_queue; 
+    QueueHandle_t controller_queue;
+    QueueHandle_t cloud_queue;
+    QueueHandle_t ui_queue; 
     
     TaskHandle_t handle; 
     TimerHandle_t timer_handle;

@@ -4,7 +4,8 @@
 static const char *TAG = "HUB_CONTROLLER"; 
 
 
-HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q) : plugProtocols(protocols), event_group(events), controller_queue(controller_q){
+HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q) : 
+plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q) {
     timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(15000), pdTRUE, this, dataRequestTimerCallback);
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
@@ -42,7 +43,7 @@ void HubController::run(){
                 check_medium_thresholds();
                 break; 
             case DATA_TYPE_PRIORITY:
-                // should we add the device to controllers map at this point once priority received from ui? -> from ui user confirms that the device should be added
+                devices[ctrl_data.device_id].priority = ctrl_data.data.value_int; 
                 ESP_LOGI(TAG, "new device priority recieved"); 
                 break;
             case DATA_TYPE_ELEC_PRICE:
@@ -74,46 +75,46 @@ void HubController::handle_zigbee_events(controller_data &data){
     {
     case DATA_TYPE_DEVICE_JOIN:
         devices.emplace(data.device_id, device_info{
-            .priority = 1, // this will be taken off
+            .priority = 0, // this will be taken off
             .online = true,
             .periodic_check_count = 0,
             .last_seen = xTaskGetTickCount(),
         });
-        ESP_LOGI(TAG, "New device received by Hub");
-        // send to ui 
+        //ESP_LOGI(TAG, "New device received by Hub");
+        xQueueSendToBack(ui_queue, &data, 0);
         break;
     case DATA_TYPE_DEVICE_LEFT:
         devices.erase(data.device_id);
-        ESP_LOGI(TAG, "Device erased from Hub map.");
-        // send to ui
+        //ESP_LOGI(TAG, "Device erased from Hub map.");
+        xQueueSendToBack(ui_queue, &data, 0);
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
-            dev->power = data.data.value;
+            //dev->power = data.data.value;
             dev->last_seen = xTaskGetTickCount(); 
-            ESP_LOGI(TAG, "Power update %.2f", data.data.value);
-            //send to ui
+            //ESP_LOGI(TAG, "Power update %.2f", data.data.value);
+            xQueueSendToBack(ui_queue, &data, 0);
         }  
         break;
     case DATA_TYPE_ENERGY:
         if (dev != nullptr) {
-            dev->energy_consumption = data.data.value;
+            //dev->energy_consumption = data.data.value;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "Energy update %.2f", data.data.value);
-            //send to ui 
+            //ESP_LOGI(TAG, "Energy update %.2f", data.data.value);
+            xQueueSendToBack(ui_queue, &data, 0);
         } 
         break;
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
-            dev->current = data.data.value;
+            //dev->current = data.data.value;
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "Current update %.2f", data.data.value);
-            //only cloud 
+            //only cloud
         } 
         break;
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
-            dev->voltage = data.data.value;
+            //dev->voltage = data.data.value;
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
             //only cloud
@@ -123,9 +124,9 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr) {
             dev->on = data.data.flag;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
+            //ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
             if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
-            //send to ui 
+            xQueueSendToBack(ui_queue, &data, 0);
         }  
         break;
     case DATA_TYPE_REPORTING:
@@ -138,10 +139,11 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr){
             dev->support_energy_consumption = data.data.flag;
             ESP_LOGI(TAG, "supports energy consumption %s", data.data.flag ? "YES" : "NO");
-            // send to ui 
+            xQueueSendToBack(ui_queue, &data, 0); 
         }
         break;
     default:
+        ESP_LOGE(TAG, "Controller received unknown zigbee data type."); 
         break;
     }
 }
@@ -186,7 +188,7 @@ void HubController::check_thresholds(){
             }
             vTaskDelay(pdMS_TO_TICKS(10));
         }
-        
+
         else if (dev.priority == 1) {
             if (current_electricity_price > threshold_low) {
                 if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
@@ -229,8 +231,9 @@ void HubController::command_handler(controller_data &data){
 void HubController::periodic_device_check(){
     
     ESP_LOGI(TAG, "periodic device check");
+    controller_data ctrl_data; 
     
-    for (auto& [key, dev] : devices) {
+    for (auto &[key, dev] : devices) {
         ++dev.periodic_check_count;
         // request electrical values.
         plugProtocols.at(ZIGBEE)->request_electrical_values(key);
@@ -250,9 +253,20 @@ void HubController::periodic_device_check(){
         // aliveness check
         if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
+            if (dev.online) {
+                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE}; // we send to ui only if state has changed
+                ctrl_data.data.flag = false;
+                xQueueSendToBack(ui_queue, &ctrl_data, 0); 
+            }
             dev.online = false;
-        } else dev.online = true; 
-
+        } else {
+            if (!dev.online) {
+                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE}; // we send to ui only if state has changed
+                ctrl_data.data.flag = true; 
+                xQueueSendToBack(ui_queue, &ctrl_data, 0); 
+            }
+            dev.online = true; 
+        } 
         vTaskDelay(pdMS_TO_TICKS(10)); // small delay so Zigbee network won't get angry. 
     }
 }
