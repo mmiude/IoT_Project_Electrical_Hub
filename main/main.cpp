@@ -47,13 +47,13 @@ void dummy_task(void *params) {
     EventGroupHandle_t e = parameters->events;
 
     controller_data fake_low_threshold = {.type = DATA_TYPE_THRESHOLD_LOW};
-    fake_low_threshold.data.threshold = 5.5;
+    fake_low_threshold.data.value = 5.5;
     
     controller_data fake_med_threshold = {.type = DATA_TYPE_THRESHOLD_MED};
-    fake_med_threshold.data.threshold = 7.5; 
+    fake_med_threshold.data.value = 7.5; 
 
     controller_data fake_electrical_price = {.type = DATA_TYPE_ELEC_PRICE};
-    fake_electrical_price.data.electricity_price = 6.9; 
+    fake_electrical_price.data.value = 6.9; 
 
     xEventGroupWaitBits(e, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY);
     vTaskDelay(pdMS_TO_TICKS(10000));
@@ -63,7 +63,7 @@ void dummy_task(void *params) {
     xQueueSendToBack(q, &fake_electrical_price, 0);
 
     while (true) {
-        fake_electrical_price.data.electricity_price = (rand() % 10) / 1.0; 
+        fake_electrical_price.data.value = (rand() % 10) / 1.0; 
         vTaskDelay(pdMS_TO_TICKS(30000));
         xQueueSendToBack(q, &fake_electrical_price, 0);
     }

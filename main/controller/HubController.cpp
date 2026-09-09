@@ -33,13 +33,13 @@ void HubController::run(){
             switch (ctrl_data.type) 
             {
             case DATA_TYPE_THRESHOLD_LOW:
-                ESP_LOGI(TAG, "new low threshold received: %.2f.", ctrl_data.data.threshold);
-                threshold_low = ctrl_data.data.threshold;
+                ESP_LOGI(TAG, "new low threshold received: %.2f.", ctrl_data.data.value);
+                threshold_low = ctrl_data.data.value;
                 check_low_thresholds();
                 break;
             case DATA_TYPE_THRESHOLD_MED:
-                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.threshold); 
-                threshold_medium = ctrl_data.data.threshold;
+                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value); 
+                threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
                 break; 
             case DATA_TYPE_PRIORITY:
@@ -47,8 +47,8 @@ void HubController::run(){
                 ESP_LOGI(TAG, "new device priority recieved"); 
                 break;
             case DATA_TYPE_ELEC_PRICE:
-                ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.electricity_price);
-                current_electricity_price = ctrl_data.data.electricity_price;
+                ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
+                current_electricity_price = ctrl_data.data.value;
                 check_low_thresholds();
                 check_medium_thresholds();
                 request_energy_consumption_values(); // these will be checked every 15mins synced with electrical prices 
@@ -91,55 +91,55 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
-            dev->power = data.data.power;
+            dev->power = data.data.value;
             dev->last_seen = xTaskGetTickCount(); 
-            ESP_LOGI(TAG, "Power update %.2f", data.data.power);
+            ESP_LOGI(TAG, "Power update %.2f", data.data.value);
             //send to ui
         }  
         break;
     case DATA_TYPE_ENERGY:
         if (dev != nullptr) {
-            dev->energy_consumption = data.data.energy_consumption;
+            dev->energy_consumption = data.data.value;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "Energy update %.2f", data.data.energy_consumption);
+            ESP_LOGI(TAG, "Energy update %.2f", data.data.value);
             //send to ui 
         } 
         break;
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
-            dev->current = data.data.current;
+            dev->current = data.data.value;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "Current update %.2f", data.data.current);
+            ESP_LOGI(TAG, "Current update %.2f", data.data.value);
             //only cloud 
         } 
         break;
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
-            dev->voltage = data.data.current;
+            dev->voltage = data.data.value;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "voltage update %.2f", data.data.voltage);
+            ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
             //only cloud
         }  
         break;
     case DATA_TYPE_SET_ON:
         if (dev != nullptr) {
-            dev->on = data.data.set_on;
+            dev->on = data.data.flag;
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "on/off state update %s", data.data.set_on ? "ON" : "OFF");
+            ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
             if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
             //send to ui 
         }  
         break;
     case DATA_TYPE_REPORTING:
         if (dev != nullptr) {
-            dev->reporting_on = data.data.supports;
-            ESP_LOGI(TAG, "supports reporting %s", data.data.supports ? "YES" : "NO");
+            dev->reporting_on = data.data.flag;
+            ESP_LOGI(TAG, "supports reporting %s", data.data.flag ? "YES" : "NO");
         }
         break;
     case DATA_TYPE_SUPPORTS_METERING:
         if (dev != nullptr){
-            dev->support_energy_consumption = data.data.supports;
-            ESP_LOGI(TAG, "supports energy consumption %s", data.data.supports ? "YES" : "NO");
+            dev->support_energy_consumption = data.data.flag;
+            ESP_LOGI(TAG, "supports energy consumption %s", data.data.flag ? "YES" : "NO");
             // send to ui 
         }
         break;

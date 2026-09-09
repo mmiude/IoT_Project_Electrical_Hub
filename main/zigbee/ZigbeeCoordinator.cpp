@@ -87,7 +87,7 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_ONOFF_REPORT:
                 if (plug) {
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SET_ON};
-                    ctrl_data.data.set_on = event.data.is_on; 
+                    ctrl_data.data.flag = event.data.is_on; 
                     xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     //plug->is_on = event.data.is_on ? "ON" : "OFF"; 
                     ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", plug->short_addr, event.data.is_on ? "ON" : "OFF");
@@ -97,7 +97,7 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_POWER_REPORT:
                 if (plug) {
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_POWER};
-                    ctrl_data.data.power = (float)event.data.raw_power * plug->power_multiplier / plug->power_divisor;
+                    ctrl_data.data.value = (float)event.data.raw_power * plug->power_multiplier / plug->power_divisor;
                     xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     //plug->active_power = (float)event.data.raw_power * plug->power_multiplier / plug->power_divisor;
                     //ESP_LOGI(TAG, "smart plug: 0x%04hx power: %.2f", plug->short_addr, plug->active_power);
@@ -106,7 +106,7 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_VOLTAGE_REPORT:
                 if (plug) {
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_VOLTAGE};
-                    ctrl_data.data.voltage = (float)event.data.raw_voltage * plug->voltage_multiplier / plug->voltage_divisor;
+                    ctrl_data.data.value = (float)event.data.raw_voltage * plug->voltage_multiplier / plug->voltage_divisor;
                     xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     //plug->voltage = (float)event.data.raw_voltage * plug->voltage_multiplier / plug->voltage_divisor;
                     //ESP_LOGI(TAG, "smart plug: 0x%04hx voltage: %.2f", plug->short_addr, plug->voltage);
@@ -115,7 +115,7 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_CURRENT_REPORT:
                 if (plug) {
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_CURRENT};
-                    ctrl_data.data.current = (float)event.data.raw_current * plug->current_multiplier / plug->current_divisor;
+                    ctrl_data.data.value = (float)event.data.raw_current * plug->current_multiplier / plug->current_divisor;
                     xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     //plug->current = (float)event.data.raw_current * plug->current_multiplier / plug->current_divisor;
                     //ESP_LOGI(TAG, "smart plug: 0x%04hx current: %.4f", plug->short_addr, plug->current); 
@@ -124,7 +124,7 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_SUMMATION_REPORT:
                 if (plug) {
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_ENERGY};
-                    ctrl_data.data.energy_consumption = (float)event.data.raw_summation * plug->summation_multiplier / plug->summation_divisor;
+                    ctrl_data.data.value = (float)event.data.raw_summation * plug->summation_multiplier / plug->summation_divisor;
                     xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     //plug->summation_kwh = (float)event.data.raw_summation * plug->summation_multiplier / plug->summation_divisor;
                     //ESP_LOGI(TAG, "smart plug: 0x%04hx summation: %.2f", plug->short_addr, plug->summation_kwh);
@@ -170,7 +170,7 @@ void ZigbeeCoordinator::run(){
                 if (plug) {
                     plug->summation_multiplier = event.data.summation_multiplier;
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING};
-                    ctrl_data.data.supports = true;
+                    ctrl_data.data.flag = true;
                     xQueueSend(controller_queue, &ctrl_data, 0);
                     plug->supports_metering = true;
                 } else ESP_LOGW(TAG, "summation multiplier from unkown smart plug");
@@ -185,7 +185,7 @@ void ZigbeeCoordinator::run(){
                 if (plug) {
                     if (event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_DIVISOR_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_MULTIPLIER_ID) {
                         ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING};
-                        ctrl_data.data.supports = false;
+                        ctrl_data.data.flag = false;
                         xQueueSend(controller_queue, &ctrl_data, 0);
                         plug->supports_metering = false;
                     } 
@@ -199,7 +199,7 @@ void ZigbeeCoordinator::run(){
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to true", plug->short_addr);
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING};
-                    ctrl_data.data.supports = true;
+                    ctrl_data.data.flag = true;
                     xQueueSend(controller_queue, &ctrl_data, 0);
                     //plug->automatic_state_reporting = true;
                 } else ESP_LOGW(TAG, "unknown plug sent state reporting successful signal");
@@ -208,7 +208,7 @@ void ZigbeeCoordinator::run(){
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to false", plug->short_addr);
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING};
-                    ctrl_data.data.supports = false;
+                    ctrl_data.data.flag = false;
                     xQueueSend(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
                 break; 

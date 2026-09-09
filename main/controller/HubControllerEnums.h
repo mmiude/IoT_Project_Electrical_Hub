@@ -24,27 +24,32 @@ typedef struct device_info {
     bool support_energy_consumption{};
     bool reporting_on{};
     float power{};
-    float energy_consumption{};
     float current{};
     float voltage{};
+    float energy_consumption{};
     TickType_t last_seen{};
 } deviceInfo;
 
 typedef enum {
+    // device lifecycle - coming from coordinator 
     DATA_TYPE_DEVICE_JOIN,
     DATA_TYPE_DEVICE_LEFT,
-    DATA_TYPE_REPORTING,
+    // measurements and metering/reporting support from coordinator
     DATA_TYPE_POWER,
     DATA_TYPE_ENERGY,
     DATA_TYPE_VOLTAGE, 
     DATA_TYPE_CURRENT,
     DATA_TYPE_SET_ON,
+    DATA_TYPE_REPORTING,
+    DATA_TYPE_SUPPORTS_METERING,
+    // threshold, priority and electricity price info coming from ui 
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,
     DATA_TYPE_PRIORITY,
     DATA_TYPE_ELEC_PRICE,
-    DATA_TYPE_SUPPORTS_METERING,
+    // commands coming from ui side
     DATA_TYPE_COMMAND,
+    // internal for controller - periodic info request from plugs
     DATA_TYPE_REQUEST_ELEC_VALUES
 } data_type_t;
 
@@ -53,16 +58,10 @@ typedef struct controller_queue_info {
     data_type_t type;
 
     union data_ {
-        float power;
-        float energy_consumption;
-        float voltage;
-        float current;
-        bool set_on;
-        bool supports;
-        float threshold;
-        int priority;
-        float electricity_price;
-        commands command;
+        float value;
+        int value_int; 
+        bool flag;
+        commands command; 
     } data;
 
 } controller_data; 
