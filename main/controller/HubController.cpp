@@ -42,6 +42,10 @@ void HubController::run(){
                 threshold_medium = ctrl_data.data.threshold;
                 check_medium_thresholds();
                 break; 
+            case DATA_TYPE_PRIORITY:
+                // should we add the device to controllers map at this point once priority received from ui? -> from ui user confirms that the device should be added
+                ESP_LOGI(TAG, "new device priority recieved"); 
+                break;
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.electricity_price);
                 current_electricity_price = ctrl_data.data.electricity_price;
@@ -51,9 +55,10 @@ void HubController::run(){
                 break;
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
-                request_electrical_values();
-                check_on_off_state();
-                check_device_aliveness(); 
+                periodic_device_check();
+                break;
+            case DATA_TYPE_COMMAND:
+                command_handler(ctrl_data);
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -72,7 +77,7 @@ void HubController::handle_zigbee_events(controller_data &data){
     {
     case DATA_TYPE_DEVICE_JOIN:
         devices.emplace(data.device_id, device_info{
-            .priority = 1,
+            .priority = 1, // this will be taken off
             .online = true,
             .last_seen = xTaskGetTickCount(), 
         });
@@ -124,12 +129,6 @@ void HubController::handle_zigbee_events(controller_data &data){
             if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
             //send to ui 
         }  
-        break;
-    case DATA_TYPE_PRIORITY:
-        if (dev != nullptr) {
-            dev->priority = data.data.priority;
-            ESP_LOGI(TAG, "Priority update");
-        }
         break;
     case DATA_TYPE_REPORTING:
         if (dev != nullptr) {
@@ -191,28 +190,49 @@ void HubController::request_energy_consumption_values(){
     }
 }
 
-void HubController::request_electrical_values(){
-    ESP_LOGI(TAG, "reqeusting electrical values"); 
-    for (auto [key, value] : devices) {
-        plugProtocols.at(ZIGBEE)->request_electrical_values(key);
-        vTaskDelay(pdMS_TO_TICKS(10));
+void HubController::command_handler(controller_data &data){
+    /*auto it = devices.find(data.device_id);
+    if (it == devices.end()) {
+        ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP"); 
+        // device requested is not on controllers list -> must be deleted from ui as well... should never happen but should we have this check anyways?
+    }*/
+    switch(data.data.command) {
+        case TOGGLE_PLUG:
+            plugProtocols.at(ZIGBEE)->toggle_plug(data.device_id);
+            break;
+        case PLUG_ON: 
+            plugProtocols.at(ZIGBEE)->set_plug_on(data.device_id);
+            break;
+        case PLUG_OFF:
+            plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id);
+            break; 
+        case OPEN_NETWORK:
+            plugProtocols.at(ZIGBEE)->open_network(); 
+            // notify leds 
+            break;
+        default:
+            ESP_LOGE(TAG, "Unknown command request");
+            break;
     }
 }
 
-void HubController::check_device_aliveness(){
+void HubController::periodic_device_check(){
+    
+    ESP_LOGI(TAG, "periodic device check");
+    
     for (auto& [key, dev] : devices) {
+        // request electrical values.
+        plugProtocols.at(ZIGBEE)->request_electrical_values(key);
+
+        // request plug state if reporting is not on for some reason.
+        if (!dev.reporting_on) plugProtocols.at(ZIGBEE)->request_on_off_state(key);
+        
+        // aliveness check
         if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             dev.online = false;
         } else dev.online = true; 
-    }
-}
 
-void HubController::check_on_off_state(){
-    for (auto& [key, dev] : devices) {
-        if (!dev.reporting_on) {
-            plugProtocols.at(ZIGBEE)->request_on_off_state(key);
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
+        vTaskDelay(pdMS_TO_TICKS(10)); // small delay so Zigbee network won't get angry. 
     }
 }

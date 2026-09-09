@@ -9,6 +9,13 @@ enum ProtocolIndex {
     ZIGBEE
 };
 
+typedef enum {
+    TOGGLE_PLUG,
+    PLUG_ON,
+    PLUG_OFF,
+    OPEN_NETWORK
+} commands;
+
 typedef struct device_info {
     int priority{};
     bool on{};
@@ -37,6 +44,7 @@ typedef enum {
     DATA_TYPE_PRIORITY,
     DATA_TYPE_ELEC_PRICE,
     DATA_TYPE_SUPPORTS_METERING,
+    DATA_TYPE_COMMAND,
     DATA_TYPE_REQUEST_ELEC_VALUES
 } data_type_t;
 
@@ -53,7 +61,8 @@ typedef struct controller_queue_info {
         bool supports;
         float threshold;
         int priority;
-        float electricity_price; 
+        float electricity_price;
+        commands command;
     } data;
 
 } controller_data; 

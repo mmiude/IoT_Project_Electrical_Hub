@@ -38,9 +38,8 @@ private:
     void check_low_thresholds();
     void check_medium_thresholds();
     void request_energy_consumption_values();
-    void request_electrical_values(); 
-    void check_device_aliveness(); 
-    void check_on_off_state(); 
+    void command_handler(controller_data &data);
+    void periodic_device_check();
 
     // calculate energy_consumption
     // calculate price (or if these to can be together)
