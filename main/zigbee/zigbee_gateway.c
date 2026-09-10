@@ -51,17 +51,17 @@ static void zdo_bind_smart_plug_result(const ezb_zdp_bind_req_result_t *result, 
     if (result->error == EZB_ERR_NONE) {
         if (result->rsp && result->rsp->status == EZB_ZDP_STATUS_SUCCESS) {
             ESP_LOGI(TAG, "Bound smart plug device successfully");
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .ieee_address = ieee_addr};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_SUCCESSFUL, .ieee_address = ieee_addr, .data.default_value = 0};
             xQueueSend(event_queue, &event, 0);
         } else {
             ESP_LOGE(TAG, "Failed to bind smart plug device with status (0x%02x)", result->rsp->status);
-            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr};
+            zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr, .data.default_value = 0};
             xQueueSend(event_queue, &event, 0);
             // send binding error signal
         }
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device with error (0x%04x)", result->error);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr};
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = ieee_addr, .data.default_value = 0};
         xQueueSend(event_queue, &event, 0);
         //send binding error signal
     }
@@ -92,7 +92,7 @@ static ezb_err_t zdo_bind_smart_plug_device(uint16_t dst_short_addr, uint8_t dst
         ESP_LOGI(TAG, "Attempt to bind smart plug device (short address: 0x%04hx)", dst_short_addr);
     } else {
         ESP_LOGE(TAG, "Failed to bind smart plug device (short address: 0x%04hx) with error(0x%04x)", dst_short_addr, ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = get_ieee_address(dst_short_addr)}; 
+        zigbee_event event = {.type = ZIGBEE_EVENT_BINDING_ERROR, .ieee_address = get_ieee_address(dst_short_addr), .data.default_value = 0}; 
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -142,7 +142,7 @@ static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
         ESP_LOGI(TAG, "Attempt to find smart_plug device");
     } else {
         ESP_LOGE(TAG, "Failed to find smart_plug device with error(0x%04x)", ret);
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = get_ieee_address(dst_addr)};
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_NOT_FOUND, .ieee_address = get_ieee_address(dst_addr), .data.default_value = 0};
         xQueueSend(event_queue, &event, 0);
     }
     return ret;
@@ -204,7 +204,7 @@ static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal)
     case EZB_ZDO_SIGNAL_LEAVE_INDICATION: { 
         const ezb_zdo_signal_leave_indication_params_t *leave_ind_params = ezb_app_signal_get_params(app_signal);
         ESP_LOGI(TAG, "Zigbee Node(0x%04hx) (0x%016llx) is leaving network", leave_ind_params->short_addr, get_ieee_address(leave_ind_params->short_addr)); 
-        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .ieee_address = get_ieee_address(leave_ind_params->short_addr)};   
+        zigbee_event event = {.type = ZIGBEE_EVENT_DEVICE_LEFT, .ieee_address = get_ieee_address(leave_ind_params->short_addr), .data.default_value = 0};   
         //ESP_LOGW(TAG, "Sending to queue handle: %p", event_queue);
         xQueueSend(event_queue, &event, 0); 
     } break;
@@ -419,12 +419,12 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
     while (response_variable != NULL) {
         if (response_variable->status == EZB_ZCL_STATUS_SUCCESS) {
             //ESP_LOGI(TAG, "  All attributes accepted (status SUCCESS)");
-            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_SUCCESS, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_SUCCESS, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.default_value = 0};   
             xQueueSend(event_queue, &event, 0);
         } else {
             //ESP_LOGW(TAG, "  attr(0x%04x) FAILED with status(0x%02x)",
             //response_variable->attr_id, response_variable->status);
-            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr)};   
+            zigbee_event event = {.type = ZIGBEE_EVENT_STATE_REPORTING_ERROR, .ieee_address = get_ieee_address(header->src_addr.u.short_addr), .data.default_value = 0};   
             xQueueSend(event_queue, &event, 0);
         }
         response_variable = response_variable->next;

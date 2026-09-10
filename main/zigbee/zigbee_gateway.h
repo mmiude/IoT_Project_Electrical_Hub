@@ -72,7 +72,7 @@ typedef enum {
     ZIGBEE_EVENT_NETWORK_CLOSED,
 } zigbee_event_type;
 
-typedef struct {
+typedef struct { // this could be cleaned (only one value per data type inside union) but Miia is too lazy to do it anymore. XD memory wise it does not matter anyways...
     zigbee_event_type type;
     uint64_t ieee_address;
     
@@ -91,7 +91,8 @@ typedef struct {
         uint16_t current_divisor; 
         uint32_t summation_multiplier; 
         uint32_t summation_divisor; 
-        uint16_t unsupported_attr; 
+        uint16_t unsupported_attr;
+        int default_value;  
         struct {
             uint16_t short_addr;
             uint8_t endpoint;

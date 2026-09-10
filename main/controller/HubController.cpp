@@ -18,7 +18,7 @@ void HubController::runner(void *params){
 
 void HubController::dataRequestTimerCallback(TimerHandle_t xTimer){
     auto instance = static_cast<HubController *>(pvTimerGetTimerID(xTimer));
-    controller_data ctrl_data = {.device_id = 0, .type = DATA_TYPE_REQUEST_ELEC_VALUES}; 
+    controller_data ctrl_data = {.device_id = 0, .type = DATA_TYPE_REQUEST_ELEC_VALUES, .data{}}; 
     xQueueSendToBack(instance->controller_queue, &ctrl_data, 0);
 }
 
@@ -280,15 +280,15 @@ void HubController::periodic_device_check(){
         if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             if (dev.online) {
-                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE}; // we send to ui only if state has changed
-                ctrl_data.data.flag = false;
+                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = false}}; // we send to ui only if state has changed
+                //ctrl_data.data.flag = false;
                 xQueueSendToBack(ui_queue, &ctrl_data, 0); 
             }
             dev.online = false;
         } else {
             if (!dev.online) {
-                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE}; // we send to ui only if state has changed
-                ctrl_data.data.flag = true; 
+                ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = true}}; // we send to ui only if state has changed
+                //ctrl_data.data.flag = true; 
                 xQueueSendToBack(ui_queue, &ctrl_data, 0); 
             }
             dev.online = true; 
