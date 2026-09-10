@@ -54,9 +54,13 @@ void HubController::run(){
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
                 periodic_device_check();
+                printf("map sizes: controller: %d\n", devices.size());
                 break;
             case DATA_TYPE_COMMAND:
                 command_handler(ctrl_data);
+                break;
+            case DATA_TYPE_NETWORK_OPEN:
+                ESP_LOGI(TAG, "NETWORK OPEN: %s. Inform leds.", ctrl_data.data.flag ? "YES" : "NO"); 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -91,7 +95,6 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
-            //dev->power = data.data.value;
             dev->last_seen = xTaskGetTickCount(); 
             //ESP_LOGI(TAG, "Power update %.2f", data.data.value);
             xQueueSendToBack(ui_queue, &data, 0);
@@ -99,7 +102,6 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_ENERGY:
         if (dev != nullptr) {
-            //dev->energy_consumption = data.data.value;
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "Energy update %.2f", data.data.value);
             xQueueSendToBack(ui_queue, &data, 0);
@@ -107,7 +109,6 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
-            //dev->current = data.data.value;
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "Current update %.2f", data.data.value);
             //only cloud
@@ -115,7 +116,6 @@ void HubController::handle_zigbee_events(controller_data &data){
         break;
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
-            //dev->voltage = data.data.value;
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
             //only cloud

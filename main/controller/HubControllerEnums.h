@@ -23,10 +23,6 @@ typedef struct device_info {
     bool automation_on{};
     bool support_energy_consumption{};
     bool reporting_on{};
-    float power{};
-    float current{};
-    float voltage{};
-    float energy_consumption{};
     int periodic_check_count{};
     TickType_t last_seen{};
 } deviceInfo;
@@ -43,6 +39,7 @@ typedef enum {
     DATA_TYPE_SET_ON,
     DATA_TYPE_REPORTING,
     DATA_TYPE_SUPPORTS_METERING,
+    DATA_TYPE_NETWORK_OPEN,
     // threshold, priority and electricity price info coming from ui 
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,
