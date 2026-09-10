@@ -37,7 +37,6 @@ private:
     std::map<uint64_t, smartPlug> devices;
 
     smartPlug* find_plug(uint64_t ieee_addr);
-
     //commands to smart plugs 
     ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep);
     ezb_err_t read_electrical_measurement_values(uint16_t dst_addr, uint8_t dst_ep);
