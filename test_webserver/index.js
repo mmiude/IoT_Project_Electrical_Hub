@@ -1,72 +1,40 @@
 const express = require("express")
 const jwt = require('jsonwebtoken');
-const postgres = require("postgres")
 const path = require("path")
 const cookieParser = require("cookie-parser")
 const deviceSign = require("./deviceSign")
 
-const authenticationRoutes = require("./routes/auth.routes")
+const authenticationRoutes = require("./routes/auth")
+const APIRoutes = require("./routes/api")
 
 const googleOauth = require("./services/google/googleOauth");
 const { verifyJwt } = require("./utils");
 const { newSession } = require("./config/auth.config");
+const { UserLoggedIn } = require("./middleware/auth");
 
 const app = express()
+
+app.set("view engine", "ejs")
+app.set("views", path.join(__dirname, "views"))
+
 app.use(express.json());
 app.use(cookieParser())
 app.use(newSession);
 
 app.use("/auth", authenticationRoutes)
+app.use("/api", APIRoutes)
 
-// const sql = postgres({
-//     host: "localhost",
-//     port: 5432,
-//     database: "spikestriker",
-//     user: "admin",
-//     password: "admin"
-// })
-
-// async function hub_id_logged(hub_id) {
-//     const found_hub_id = await sql`
-//         SELECT * FROM valid_hub_ids
-//         WHERE hub_id = ${hub_id}
-//     `
-//     return found_hub_id.count > 0
-// }
-
-// async function log_hub_id(hub_id) {
-//     const hub = await sql`
-//         INSERT INTO valid_hub_ids (hub_id)
-//         VALUES (${hub_id})
-//     `
-// }
-
-// async function create_hub(hub_id, signature) {
-//     const hub = await sql`
-//         INSERT INTO hub (id, signature)
-//         VALUES (${hub_id}, ${signature})
-//     `
-// }
-
-
-app.get("/", (req, res) => {
-    const refreshToken = req.cookies["refresh_token"]
-    const session = req.session
-    console.log(session.id)
-    console.log(refreshToken)
-
-    const { valid, decodedJwt } = verifyJwt(refreshToken)
-    console.log(decodedJwt)
-    if (!valid || (valid && session.id != decodedJwt.session)) {
-        return res.redirect("/login")
-    }
-    res.send(`Logged in as ${session.name}`)
-
-    // res.send("Hello world: " + req.query.id)
+app.get("/", UserLoggedIn, (req, res) => {
+    // console.log(req.access_token)
+    const data = { user: req.session.name, access_token: req.access_token }
+    // const data = { user: "cool user", access_token: "test_token" }
+    res.render("test", { data })
+    // res.send(`Logged in as ${req.session.name}`)
 })
 
 app.get("/login", (req, res) => {
-    res.sendFile(path.resolve("./templates/login.html"))
+    // res.sendFile(path.resolve("./templates/login.html"))
+    res.render("login")
 })
 // app.get("/googleLogin", (req, res) => {
 //     res.status(301).redirect(googleOauth.getGoogleOauthUrl())
@@ -93,11 +61,6 @@ app.get("/login", (req, res) => {
 //     }
 
 // })
-
-app.post("/send", (req, res) => {
-    console.log(req.body)
-    res.send("OK")
-})
 
 // app.post("/initial_log_to_db", async (req, res) => {
 //     const auth = req.get("Authorization")

@@ -3,21 +3,16 @@ const config = require("./config/app.config");
 
 const { jwtSecret } = config;
 
-// interface VerifyJwtReturntypes {
-//     valid: boolean;
-//     decodedJwt: any;
-// }
-
-function signJwt(object, options = {}) {
-    return jwt.sign(object, jwtSecret, {
+function signJwt(object, secret, options = {}) {
+    return jwt.sign(object, secret, {
         ...options,
         algorithm: 'HS256',
     });
 }
 
-function verifyJwt(token) {
+function verifyJwt(token, secret) {
     try {
-        const decoded = jwt.verify(token, jwtSecret);
+        const decoded = jwt.verify(token, secret);
         return {
             valid: true,
             decodedJwt: decoded,

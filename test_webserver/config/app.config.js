@@ -10,9 +10,10 @@ const config = {
     dbName: process.env.DB_NAME,
     dbUser: process.env.DB_USER,
     dbPassword: process.env.DB_PASSWORD,
-    accessTokenTtl: '30m',
+    accessTokenTtl: '1m',
     refreshTokenTtl: '1y',
-    jwtSecret: process.env.JWT_SECRET
+    jwtSecret: process.env.JWT_SECRET,
+    deviceJWTSecret: process.env.DEVICE_JWT_SECRET
 }
 
 module.exports = config

@@ -37,7 +37,8 @@ async function googleOauthHandler(req, res) {
 
     const userData = { userId, userName, email }
     const refreshToken = signJwt(
-        { ...userData, session: session.id },
+        { userData, session: session.id },
+        config.jwtSecret,
         { expiresIn: refreshTokenTtl }
     );
 
