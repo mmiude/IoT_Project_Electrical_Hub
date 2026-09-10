@@ -2314,6 +2314,14 @@ CONFIG_DEFAULT_PIN_TO_RCP_BOOT=8
 CONFIG_DEFAULT_PIN_TO_RCP_TX=17
 CONFIG_DEFAULT_PIN_TO_RCP_RX=18
 # end of OpenThread RCP Update
+
+#
+# jsmn
+#
+# CONFIG_JSMN_PARENT_LINKS is not set
+# CONFIG_JSMN_STRICT is not set
+# CONFIG_JSMN_STATIC is not set
+# end of jsmn
 # end of Component config
 
 # CONFIG_IDF_EXPERIMENTAL_FEATURES is not set

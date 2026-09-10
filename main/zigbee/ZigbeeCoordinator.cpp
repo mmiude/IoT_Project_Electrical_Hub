@@ -1,4 +1,5 @@
 #include "ZigbeeCoordinator.h"
+#include "HubControllerEnums.h"
 #include <algorithm>
 
 static const char *TAG = "COORDINATOR"; 
@@ -6,7 +7,7 @@ static const char *TAG = "COORDINATOR";
 ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupHandle_t events) : controller_queue(controller_queue), event_group(events) {
 
     event_queue_t = zigbee_gateway_get_queue();
-    //xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, NULL, tskIDLE_PRIORITY + 3, NULL); 
+    xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, event_group, tskIDLE_PRIORITY + 3, &gateway_task_handle); 
     xTaskCreate(ZigbeeCoordinator::runner, "ZB_COORDINATOR", 4096 * 2, this, tskIDLE_PRIORITY + 2,  &task_handle);
 
 }
@@ -15,9 +16,6 @@ ZigbeeCoordinator::ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupH
 
 void ZigbeeCoordinator::runner(void *params){
     auto instance = static_cast<ZigbeeCoordinator *>(params);
-    xEventGroupWaitBits(instance->event_group, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
-    ESP_LOGI(TAG, "starting zigbee tasks");
-    xTaskCreate(esp_zigbee_stack_main_task, "ZB_GATEWAY", 4096 * 2, instance->event_group, tskIDLE_PRIORITY + 3, &instance->gateway_task_handle);
     xEventGroupWaitBits(instance->event_group, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY); // wait that zigbee stack is initialized 
     instance->run(); 
 }
@@ -28,20 +26,13 @@ void ZigbeeCoordinator::run(){
     if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
     ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
     zigbee_event event;
-    int monitor = 0; 
-
+    
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
 
+            controller_data ctrl_data{};
             auto plug = find_plug(event.ieee_address);
-            //auto it = devices.find(event.ieee_address);  // everytime event is received we first search if the plug already exsists on the  map. 
-            //smartPlug *plug = (it != devices.end()) ? &it->second : nullptr; 
-            /*if(++monitor % 5 == 0) {
-                ESP_LOGW(TAG, "=== STACK MONITOR ==="); 
-                ESP_LOGW(TAG, "coordinator stack free: %d bytes", uxTaskGetStackHighWaterMark(task_handle));
-                ESP_LOGW(TAG, "gateway stack free: %d bytes", uxTaskGetStackHighWaterMark(gateway_task_handle));
-            }*/  
-
+   
             switch (event.type) 
             {
             case ZIGBEE_EVENT_DEVICE_JOINED:
@@ -52,8 +43,10 @@ void ZigbeeCoordinator::run(){
                     }); 
                     if (devices_inserted){
                         ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
-                        read_electrical_measurement_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // should these be part of joining 
-                        read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); // part of joining?
+                        read_electrical_measurement_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); 
+                        read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); 
+                        ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_JOIN, .data{}};
+                        xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     } 
                 } else {
                      ESP_LOGI(TAG, "known plug rejoined");
@@ -62,7 +55,7 @@ void ZigbeeCoordinator::run(){
                 break; 
             case ZIGBEE_EVENT_DEVICE_NOT_FOUND:
                 if (plug){
-                    ESP_LOGI(TAG, "known plug failed to be found again..."); // needs testing... this might happen because of timeout error, but plug has reproting configured already...
+                    ESP_LOGI(TAG, "known plug failed to be found again..."); 
                     plug->short_addr = event.data.device_joining.short_addr; // update short address in case it has changed
                 } else ESP_LOGE(TAG, "unkonw device not found. RESET DEVICE!");
                 break;
@@ -84,37 +77,44 @@ void ZigbeeCoordinator::run(){
                 ESP_LOGI(TAG, "smart plug left: 0x%016llx", event.ieee_address);
                 if (plug) {
                     devices.erase(event.ieee_address);
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_LEFT, .data{}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "unkonwn devices left");
                 break;
             case ZIGBEE_EVENT_ONOFF_REPORT:
                 if (plug) {
-                    plug->is_on = event.data.is_on ? "ON" : "OFF";
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SET_ON, .data = {.flag = event.data.is_on}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     ESP_LOGI(TAG, "smart plug: 0x%04hx on/off report (ON/OFF state: %s)", plug->short_addr, event.data.is_on ? "ON" : "OFF");
                 }
                 else ESP_LOGW(TAG, "on/off report from unkown smart plug");
                 break; 
             case ZIGBEE_EVENT_POWER_REPORT:
                 if (plug) {
-                    plug->active_power = (float)event.data.raw_power * plug->power_multiplier / plug->power_divisor;
-                    ESP_LOGI(TAG, "smart plug: 0x%04hx power: %.2f", plug->short_addr, plug->active_power);
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_POWER, .data = {
+                        .value = static_cast<float>(event.data.raw_power) * plug->power_multiplier / plug->power_divisor}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "power report from unkown smart plug");
                 break;
             case ZIGBEE_EVENT_VOLTAGE_REPORT:
                 if (plug) {
-                    plug->voltage = (float)event.data.raw_voltage * plug->voltage_multiplier / plug->voltage_divisor;
-                    ESP_LOGI(TAG, "smart plug: 0x%04hx voltage: %.2f", plug->short_addr, plug->voltage);
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_VOLTAGE, .data = {
+                        .value = static_cast<float>(event.data.raw_voltage) * plug->voltage_multiplier / plug->voltage_divisor}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "voltage report from unkown smart plug");
                 break;
             case ZIGBEE_EVENT_CURRENT_REPORT:
                 if (plug) {
-                    plug->current = (float)event.data.raw_current * plug->current_multiplier / plug->current_divisor;
-                    ESP_LOGI(TAG, "smart plug: 0x%04hx current: %.4f", plug->short_addr, plug->current); 
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_CURRENT, .data = {
+                        .value = static_cast<float>(event.data.raw_current) * plug->current_multiplier / plug->current_divisor}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "current report from unkown smart plug"); 
                 break;
             case ZIGBEE_EVENT_SUMMATION_REPORT:
                 if (plug) {
-                    plug->summation_kwh = (float)event.data.raw_summation * plug->summation_multiplier / plug->summation_divisor;
-                    ESP_LOGI(TAG, "smart plug: 0x%04hx summation: %.2f", plug->short_addr, plug->summation_kwh);
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_ENERGY, .data = {
+                        .value = static_cast<float>(event.data.raw_summation) * plug->summation_multiplier / plug->summation_divisor}};
+                    xQueueSendToBack(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "summation report from unkown smart plug");
                 break;
             case ZIGBEE_EVENT_POWER_MULTIPLIER:
@@ -156,6 +156,8 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_SUMMATION_MULTIPLIER:
                 if (plug) {
                     plug->summation_multiplier = event.data.summation_multiplier;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = true}};
+                    xQueueSend(controller_queue, &ctrl_data, 0);
                     plug->supports_metering = true;
                 } else ESP_LOGW(TAG, "summation multiplier from unkown smart plug");
                 break;
@@ -168,6 +170,8 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_ATTRIBUTE_SUPPORT_ERROR:
                 if (plug) {
                     if (event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_DIVISOR_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_METERING_MULTIPLIER_ID) {
+                        ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = false}};
+                        xQueueSend(controller_queue, &ctrl_data, 0);
                         plug->supports_metering = false;
                     } 
                     else if (event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_POWER_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_VOLTAGE_MULTIPLIER_ID || event.data.unsupported_attr == EZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AC_CURRENT_MULTIPLIER_ID) {
@@ -179,37 +183,47 @@ void ZigbeeCoordinator::run(){
             case ZIGBEE_EVENT_STATE_REPORTING_SUCCESS:
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to true", plug->short_addr);
-                    plug->automatic_state_reporting = true;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING, .data = {.flag = true}};
+                    //ctrl_data.data.flag = true;
+                    xQueueSend(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "unknown plug sent state reporting successful signal");
                 break;
             case ZIGBEE_EVENT_STATE_REPORTING_ERROR:
                 if (plug) {
                     ESP_LOGI(TAG, "plug: (0x%04hx) reporting set to false", plug->short_addr);
-                    plug->automatic_state_reporting = false;
+                    ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING, .data = {.flag = false}};
+                    //ctrl_data.data.flag = false;
+                    xQueueSend(controller_queue, &ctrl_data, 0);
                 } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
                 break; 
             case ZIGBEE_EVENT_NETWORK_OPEN:
                 ESP_LOGI(TAG, "Network open for 3 mins");
+                ctrl_data = {.device_id = 0, .type = DATA_TYPE_NETWORK_OPEN, .data = {.flag = true}};
+                //ctrl_data.data.flag = true; 
+                xQueueSend(controller_queue, &ctrl_data, 0);
                 break;
             case ZIGBEE_EVENT_NETWORK_CLOSED:
                 ESP_LOGI(TAG, "Network close");
+                ctrl_data = {.device_id = 0, .type = DATA_TYPE_NETWORK_OPEN, .data = {.flag = false}};
+                xQueueSend(controller_queue, &ctrl_data, 0);
                 break;
             default:
                 ESP_LOGW(TAG, "unknown event type");
                 break;
             }
-        }
+        }  
     }
 }
 
 // public methods - accessed via IDeviceProtocol interface 
 void ZigbeeCoordinator::request_energy_consumption_values(uint64_t device_id){
     auto plug = find_plug(device_id);
-    if (plug) {
+    if (plug && plug->supports_metering) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
         read_energy_consumption_value(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
     } else ESP_LOGE(TAG, "Requesting energy consumption values failed. Unknown plug!");
+    printf("coordinator map size: %d\n", devices.size());
 }
 
 void ZigbeeCoordinator::request_electrical_values(uint64_t device_id){
@@ -264,7 +278,7 @@ void ZigbeeCoordinator::open_network(){
     esp_zigbee_lock_release();
 }
 
-int ZigbeeCoordinator::check_device_count(){
+int ZigbeeCoordinator::check_device_count(){ // helper to debug if needed
     for (const auto& [key, value] : devices) {
         printf("Device short_addr: 0x%04hx, key: 0x%016llx\n", value.short_addr, key); 
     }
@@ -307,6 +321,7 @@ ezb_err_t ZigbeeCoordinator::read_electrical_measurement_multipliers(uint16_t ds
             },
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         },
         .payload = {
@@ -345,6 +360,7 @@ ezb_err_t ZigbeeCoordinator::read_electrical_measurement_values(uint16_t dst_add
             },
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         },
         .payload = {
@@ -382,6 +398,7 @@ ezb_err_t ZigbeeCoordinator::read_energy_consumption_multipliers(uint16_t dst_ad
             },
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         },
         .payload = {
@@ -416,6 +433,7 @@ ezb_err_t ZigbeeCoordinator::read_energy_consumption_value(uint16_t dst_addr, ui
             },
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         },
         .payload = {
@@ -450,6 +468,7 @@ esp_err_t ZigbeeCoordinator::read_plug_on_off_state(uint16_t dst_addr, uint8_t d
             },
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         },
         .payload = {
@@ -476,6 +495,7 @@ esp_err_t ZigbeeCoordinator::send_toggle_smart_plug(uint16_t dst_addr, uint8_t d
             .dis_default_rsp = false,
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         }
     };
@@ -500,6 +520,7 @@ esp_err_t ZigbeeCoordinator::send_on_smart_plug(uint16_t dst_addr, uint8_t dst_e
             .dis_default_rsp = false,
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         }
     };
@@ -524,6 +545,7 @@ esp_err_t ZigbeeCoordinator::send_off_smart_plug(uint16_t dst_addr, uint8_t dst_
             .dis_default_rsp = false,
             .cnf_ctx = {
                 .cb = 0,
+                .user_ctx = 0,
             },
         }
     };
