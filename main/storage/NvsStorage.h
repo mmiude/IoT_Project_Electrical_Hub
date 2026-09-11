@@ -4,13 +4,14 @@
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include <string>
+#include <vector>
 
 class NvsStorage {
 public:
     NvsStorage(const std::string &nameSpace_n);
     ~NvsStorage();
 
-    // restricted to trivially copyable types only!! 
+    // restricted to trivially copyable types only!! - static_assert(std::is_trivially_copyable<T>::value???)
     template<typename T>
     esp_err_t read_blob(const std::string &key, T &data) { 
         if (!handle) return ESP_ERR_NVS_INVALID_HANDLE; 
@@ -24,6 +25,28 @@ public:
         esp_err_t err = nvs_set_blob(handle, key.c_str(), &data, sizeof(T));
         if (err == ESP_OK) nvs_commit(handle);
         return err;
+    }
+
+    template<typename T>
+    esp_err_t read_vector(const std::string &key, std::vector<T> &vec) {
+        size_t length = 0; 
+
+        esp_err_t err = nvs_get_blob(handle, key.c_str(), NULL, length);
+        if (err != ESP_OK) return err;
+
+        vec.resize(length / sizeof(T));
+        return nvs_get_blob(handle, key.c_str, vec.data(), length);
+    }
+
+    template<typename T>
+    esp_err_t write_vector(const std::string &key, std::vector<T> &vec) {
+        if (!handle) return ESP_ERR_NVS_INVALID_HANDLE; 
+
+        esp_err_t err = nvs_set_blob(handle, key.c_str(), vec.data(), vec.size() * sizeof(T));
+        if (err == ESP_OK) {
+            err = nvs_commit(handle);
+        }
+        return err; 
     }
 
     esp_err_t read_string(const std::string &key, std::string &word);
