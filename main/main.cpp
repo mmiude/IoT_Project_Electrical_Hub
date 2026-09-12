@@ -29,6 +29,8 @@
 #include "HubController.h"
 #include "HubControllerEnums.h"
 
+#include "NvsStorage.h"
+
 
 #define UART_PORT_NUM      UART_NUM_0
 #define BUF_SIZE           (1024)
@@ -122,21 +124,88 @@ void dummy_ui_task(void *params) {
     }
 }*/
 
+void dummy_memory(void *params) {
+    NvsStorage storage("test_s");
+
+    smartPlugInfo plug_1 = {
+        .short_addr = 23,
+        .endpoint = 1, 
+        .supports_metering = true,
+        .supports_electrical_measurement = true,
+        .current_divisor = 1000,
+        .current_multiplier = 1,
+        .voltage_divisor = 1000,
+        .voltage_multiplier = 1,
+        .power_divisor = 1000,
+        .power_multiplier = 1,
+        .summation_divisor = 1000,
+        .summation_multiplier = 1
+    };
+
+    smartPlugInfo plug_2 = {
+        .short_addr = 55,
+        .endpoint = 1, 
+        .supports_metering = false,
+        .supports_electrical_measurement = true,
+        .current_divisor = 1000,
+        .current_multiplier = 1,
+        .voltage_divisor = 1000,
+        .voltage_multiplier = 1,
+        .power_divisor = 1000,
+        .power_multiplier = 1,
+        .summation_divisor = 1000,
+        .summation_multiplier = 1
+    };
+
+
+    std::vector<smartPlugInfo> devices;
+    std::vector<smartPlugInfo> read_devices;
+
+    devices.push_back(plug_1);
+    devices.push_back(plug_2);
+
+    while (true) {  
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        ESP_LOGW(TAG, "writing to nvs...");
+        ESP_LOGI(TAG, "SIZES: devices: %d", devices.size() * sizeof(smartPlug));
+        esp_err_t err = storage.write_vector("test_v", devices);
+        if (err == ESP_OK) ESP_LOGI(TAG, "writing was successfull."); 
+        else ESP_LOGE(TAG, "error while writing blob vector.");
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGW(TAG, "reading info back");
+        err = storage.read_vector("test_v", read_devices);
+        
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "reading successfull.");
+            ESP_LOGI(TAG, "***** INFO *****");
+            for (auto &dev : read_devices) {
+                ESP_LOGI(TAG, "short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
+                    dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
+            }
+        }
+        else ESP_LOGE(TAG, "error while reading blob");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        err = storage.erase_all(); 
+        ESP_LOGI(TAG, "erasing successfull."); 
+    }
+}
+
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
-    IPStack ipstack(wifi_eg);
-    ipstack.connect_wifi(SSID, PW);
+    //IPStack ipstack(wifi_eg);
+    //ipstack.connect_wifi(SSID, PW);
 
     static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
     static QueueHandle_t uiQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to local ui via this queue.
     static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side 
     static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
 
-    CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
+    //CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)
@@ -149,6 +218,7 @@ extern "C" void app_main(void)
 
     //xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
     //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL); 
+    xTaskCreate(dummy_memory, "MEMORY_TEST", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));

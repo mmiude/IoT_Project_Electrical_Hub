@@ -27,14 +27,6 @@ esp_err_t NvsStorage::read_string(const std::string &key, std::string &word) {
 
     word.resize(required_size - 1);
     return nvs_get_str(handle, key.c_str(), &word[0], &required_size);
-
-    /*if (err != ESP_OK) {
-        ESP_LOGE("NVS", "error reading string: %s", esp_err_to_name(err));
-        return err;
-    }
-
-    word = std::string(buffer.data());
-    return ESP_OK; */
 }
 
 esp_err_t NvsStorage::write_string(const std::string &key, const std::string &word) {
