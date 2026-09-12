@@ -19,7 +19,8 @@ public:
         size_t size = sizeof(T);
         return nvs_get_blob(handle, key.c_str(), &data, &size);
     }
-
+    
+    // restricted to trivially copyable types only!!
     template<typename T>
     esp_err_t write_blob(const std::string &key, const T &data){
         if (!handle) return ESP_ERR_NVS_INVALID_HANDLE;
@@ -29,6 +30,7 @@ public:
         return err;
     }
 
+    // restricted to trivially copyable types only!!
     template<typename T>
     esp_err_t read_vector(const std::string &key, std::vector<T> &vec) {
         if (!handle) return ESP_ERR_NVS_INVALID_HANDLE; 
@@ -43,6 +45,7 @@ public:
         return nvs_get_blob(handle, key.c_str(), vec.data(), &length);
     }
 
+    // restricted to trivially copyable types only!!
     template<typename T>
     esp_err_t write_vector(const std::string &key, std::vector<T> &vec) {
         if (!handle) return ESP_ERR_NVS_INVALID_HANDLE; 
