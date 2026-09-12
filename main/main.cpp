@@ -34,7 +34,7 @@
 #define BUF_SIZE           (1024)
 
 static const char *TAG = "MAIN"; 
-
+// it's alive
 /*typedef struct {
     QueueHandle_t q;
     EventGroupHandle_t events;
