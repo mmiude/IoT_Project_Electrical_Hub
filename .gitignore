@@ -19,3 +19,5 @@ network_info.h
 test_webserver/node_modules
 test_webserver/keys
 test_webserver/.env
+
+dependencies.lock
