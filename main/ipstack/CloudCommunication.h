@@ -7,6 +7,7 @@
 
 #include "jwt.h"
 #include "IPStack.h"
+#include "HubControllerEnums.h"
 
 #include <vector>
 
@@ -40,19 +41,20 @@ MrY=\n\
 
 #define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
 
-enum class Commands {
-    TOGGLE_PLUG,
-    PLUG_ON,
-    PLUG_OFF,
-    OPEN_NETWORK
-};
+// enum class Commands {
+//     TOGGLE_PLUG,
+//     PLUG_ON,
+//     PLUG_OFF,
+//     OPEN_NETWORK
+// };
 
-typedef struct {
-    Commands command;
-    uint64_t device_id;
-} HubCommand;
+// typedef struct {
+//     Commands command;
+//     uint64_t device_id;
+// } HubCommand;
 
 #define JSMN_TOKENS_SIZE 20
+#define MINUTE_TO_MS 60 * 1000
 
 class CloudCommunication
 {
@@ -60,16 +62,18 @@ private:
     IPStack *ipstack;
     EventGroupHandle_t wifi_eg;
 
-    QueueHandle_t tb_command_q;
+    // QueueHandle_t tb_command_q;
+    QueueHandle_t controller_q;
 
     static void sign_task(void *param);
     static void tb_read_command_task(void *param);
+    static void get_electricity_price_task(void *param);
 
-    bool parse_talkback_response_json(const char *response, HubCommand *hub_command);
+    // bool parse_talkback_response_json(const char *response, controller_data *ctrl_data);
 
 public:
     CloudCommunication(IPStack *_ipstack,
-        EventGroupHandle_t _wifi_eg, QueueHandle_t _tb_command_q);
+        EventGroupHandle_t _wifi_eg, /*QueueHandle_t _tb_command_q, */QueueHandle_t _controller_q);
 };
 
 #endif
