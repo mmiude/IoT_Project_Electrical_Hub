@@ -5,13 +5,13 @@
 #include "freertos/queue.h"
 #include "freertos/event_groups.h"
 
-//NOTE; just a placeholder for now 
+//NOTE; mirrors the dummy task in main.cpp! no display stuff yet
 
 struct UiTaskParams {
 
-    //ideas:
-    //ui -> controller: threshholds: priority, elect price, commands?
-    //controller -> ui: device lifecycle, measurements, online state
+    QueueHandle_t controller_queue;
+    QueueHandle_t ui_queue;
+    EventGroupHandle_t events;
 
 };
 
