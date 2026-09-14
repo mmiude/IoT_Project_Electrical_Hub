@@ -5,6 +5,8 @@
 #include "freertos/queue.h"
 #include "freertos/event_groups.h"
 
+//NOTE; just a placeholder for now 
+
 struct UiTaskParams {
 
     //ideas:
