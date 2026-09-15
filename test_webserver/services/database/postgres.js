@@ -25,11 +25,12 @@ class Postgres {
             SELECT * FROM valid_hub_ids
             WHERE hub_id = ${hub_id}
         `
+        console.log(`Hub ids ${found_hub_id.count}`)
         return found_hub_id.count > 0
     }
 
     async log_hub_id(hub_id) {
-        const hub = await this.sql`
+        await this.sql`
             INSERT INTO valid_hub_ids (hub_id)
             VALUES (${hub_id})
         `

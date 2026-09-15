@@ -16,7 +16,7 @@ async function LogDevicetoDB(req, res) {
         const pg = new Postgres()
         const logged = await pg.hub_id_logged(decodedJwt.device)
         if (!logged) {
-            await pg.log_hub_id(decoded.device)
+            await pg.log_hub_id(decodedJwt.device)
         }
         await pg.sql.end()
         res.send("OK")
