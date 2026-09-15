@@ -30,6 +30,7 @@
 #include "HubControllerEnums.h"
 
 #include "NvsStorage.h"
+#include "DeviceInfoStorage.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -125,7 +126,8 @@ void dummy_ui_task(void *params) {
 }*/
 
 void dummy_memory(void *params) {
-    NvsStorage storage("test_s");
+
+    DeviceInfoStorage<smartPlugInfo> storage("test_3", "testing");
 
     smartPlugInfo plug_1 = {
         .short_addr = 23,
@@ -157,36 +159,50 @@ void dummy_memory(void *params) {
         .summation_multiplier = 1
     };
 
+    std::map<uint64_t, smartPlugInfo> devices_map; 
+    devices_map.emplace(222, plug_1);
+    devices_map.emplace(333, plug_2);
 
-    std::vector<smartPlugInfo> devices;
-    std::vector<smartPlugInfo> read_devices;
-
-    devices.push_back(plug_1);
-    devices.push_back(plug_2);
+    std::map<uint64_t, smartPlugInfo> read_device_map;
 
     while (true) {  
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        ESP_LOGW(TAG, "writing to nvs...");
-        ESP_LOGI(TAG, "SIZES: devices: %d", devices.size() * sizeof(smartPlug));
-        esp_err_t err = storage.write_vector("test_v", devices);
-        if (err == ESP_OK) ESP_LOGI(TAG, "writing was successfull."); 
-        else ESP_LOGE(TAG, "error while writing blob vector.");
 
         vTaskDelay(pdMS_TO_TICKS(5000));
-        ESP_LOGW(TAG, "reading info back");
-        err = storage.read_vector("test_v", read_devices);
+
+        esp_err_t err = storage.get_all_devices(read_device_map);
         
         if (err == ESP_OK) {
             ESP_LOGI(TAG, "reading successfull.");
             ESP_LOGI(TAG, "***** INFO *****");
-            for (auto &dev : read_devices) {
-                ESP_LOGI(TAG, "short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
-                    dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
+            for (auto &[key, dev]: read_device_map) {
+                ESP_LOGI(TAG, "key: %llu, short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
+                    key, dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
+            }
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10000));
+        ESP_LOGW(TAG, "writing to nvs...");
+        for (auto &[key, dev] : devices_map) {
+            esp_err_t err = storage.save_device(key, dev);
+            if (err == ESP_OK) ESP_LOGI(TAG, "succesfully saved device info from map.");
+        }; 
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGW(TAG, "reading info back");
+        
+        err = storage.get_all_devices(read_device_map);
+        
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "reading successfull.");
+            ESP_LOGI(TAG, "***** INFO *****");
+            for (auto &[key, dev]: read_device_map) {
+                ESP_LOGI(TAG, "key: %llu, short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
+                    key, dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
             }
         }
         else ESP_LOGE(TAG, "error while reading blob");
         vTaskDelay(pdMS_TO_TICKS(5000));
-        err = storage.erase_all(); 
+        err = storage.eares_name_space();  
         ESP_LOGI(TAG, "erasing successfull."); 
     }
 }
