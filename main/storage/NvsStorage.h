@@ -47,7 +47,7 @@ public:
 
     // restricted to trivially copyable types only!!
     template<typename T>
-    esp_err_t write_vector(const std::string &key, std::vector<T> &vec) {
+    esp_err_t write_vector(const std::string &key, const std::vector<T> &vec) {
         if (!handle) return ESP_ERR_NVS_INVALID_HANDLE; 
 
         esp_err_t err = nvs_set_blob(handle, key.c_str(), vec.data(), vec.size() * sizeof(T));

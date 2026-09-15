@@ -10,37 +10,39 @@ public:
         // automatically read vector from memory at boot
         esp_err_t err = storage.read_vector(keyName, deviceCache); 
 
-        if (err == ESP_OK) ESP_LOGI(TAG, "Successfully read info from nvs namespace: %s with key: %s", ns_name, keyName);
-        else if (err == ESP_ERR_NVS_NOT_FOUND) ESP_LOGW(TAG, "Namespace: %s and key: %s empty.", ns_name, keyName);
-        else ESP_LOGE(TAG, "error: (%s) while reading namespace: %s with key: %s", esp_err_to_name(err), ns_name, keyName); 
+        if (err == ESP_OK) ESP_LOGI(TAG, "Successfully read info from nvs namespace: %s with key: %s", ns_name.c_str(), keyName.c_str());
+        else if (err == ESP_ERR_NVS_NOT_FOUND) ESP_LOGW(TAG, "Namespace: %s and key: %s empty.", ns_name.c_str(), keyName.c_str());
+        else ESP_LOGE(TAG, "error: (%s) while reading namespace: %s with key: %s", esp_err_to_name(err), ns_name.c_str(), keyName.c_str()); 
 
     }
     ~DeviceInfoStorage() = default; 
 
-    esp_err_t save_device(T &device_struct) {
+    esp_err_t save_device(const uint64_t dev_id, const T &device_struct) {
         auto it = std::ranges::find_if(deviceCache, 
             [&] (const auto& cache) { 
-                return cache.dev_id == device_struct.dev_id;
+                return cache.first == dev_id;
             }
         );
         if (it != deviceCache.end()) {
             ESP_LOGI(TAG, "Updating existing dev.");
-            *it = device_struct;
+            it->second = device_struct;
         } else {
             ESP_LOGI(TAG, "adding new device");
-            deviceCahce.push_back(device_struct);
+            deviceCache.emplace_back(dev_id, device_struct);
         }
         return storage.write_vector(keyName, deviceCache);
     }
 
-    const std::vector<T>& get_all_devices() const{
-        return deviceCache; 
+    esp_err_t get_all_devices(std::map<uint64_t, T> &devices) const{ // this should be called on during boot! 
+        devices.clear();
+        devices.insert(deviceCache.begin(), deviceCache.end());
+        return ESP_OK; 
     }
 
-    esp_err_t delete_device_from_memroy(uint64_t dev_id) {
+    esp_err_t delete_device_from_memory(uint64_t dev_id) {
         auto it = std::ranges::find_if(deviceCache, 
             [&] (const auto& cache) { 
-                return cache.dev_id == dev_id;
+                return cache.first == dev_id;
             }
         );
         if (it != deviceCache.end()) {
@@ -48,13 +50,13 @@ public:
             return storage.write_vector(keyName, deviceCache); 
         }
         ESP_LOGE(TAG, "trying to delete a device which does not exist on device cache");
-        return ESP_ERR_NVS_NOT_FOUND // or something else here
+        return ESP_ERR_NVS_NOT_FOUND; // or something else here
     }
 
 private:
     NvsStorage storage; 
     std::string keyName; 
-    std::vector<T> deviceCache; 
+    std::vector<std::pair<uint64_t, T>> deviceCache; 
 };
 
 #endif //DEVICEINFOSTORAGE_H
