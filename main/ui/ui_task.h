@@ -5,7 +5,7 @@
 #include "freertos/queue.h"
 #include "freertos/event_groups.h"
 
-//NOTE; mirrors the dummy task in main.cpp! no display stuff yet
+//NOTE; mirrors the dummy task in main.cpp! TODO; placeholder screens for menus 
 
 struct UiTaskParams {
 
