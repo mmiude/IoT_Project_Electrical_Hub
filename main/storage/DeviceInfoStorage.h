@@ -1,6 +1,18 @@
 #ifndef DEVICEINFOSTORAGE_H
 #define DEVICEINFOSTORAGE_H
 
+#include <string>
+#include <vector>
+#include <utility>
+#include <map>
+#include <algorithm> 
+#include <cstdint>
+
+#include "esp_err.h"
+#include "esp_log.h"
+
+#include "NvsStorage.h"
+
 template<typename T>
 class DeviceInfoStorage {
 public:
@@ -52,6 +64,7 @@ public:
     }
 
     esp_err_t eares_name_space() {
+        deviceCache.clear();
         return storage.erase_all(); 
     }
 

@@ -3,7 +3,7 @@
 NvsStorage::NvsStorage(const std::string &nameSpace_n) : nameSpaceName(nameSpace_n) {
     esp_err_t err = nvs_open(nameSpaceName.c_str(), NVS_READWRITE, &handle);
     if (err != ESP_OK) {
-        ESP_LOGE("NVS", "failed to open: %s", nameSpaceName); 
+        ESP_LOGE("NVS", "failed to open: %s", nameSpaceName.c_str()); 
         handle = 0; 
     }
 }

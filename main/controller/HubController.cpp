@@ -4,8 +4,8 @@
 static const char *TAG = "HUB_CONTROLLER"; 
 
 
-HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q) : 
-plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q) {
+HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage) : 
+plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q), storage(dev_stroage) {
     timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(15000), pdTRUE, this, dataRequestTimerCallback);
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
@@ -26,6 +26,11 @@ void HubController::run(){
     ESP_LOGI(TAG, "Starting hub controller task...");
     xTimerStart(timer_handle, 0);
     controller_data ctrl_data;
+
+
+    storage->get_all_devices(devices); 
+    if (devices.empty()) ESP_LOGI(TAG, "no device info saved on NVS.");
+    else check_device_map();
     
     while (true) {
 
@@ -42,10 +47,14 @@ void HubController::run(){
                 threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
                 break; 
-            case DATA_TYPE_PRIORITY:
-                devices[ctrl_data.device_id].priority = ctrl_data.data.value_int; 
+            case DATA_TYPE_PRIORITY: {
+                deviceInfo &dev = devices[ctrl_data.device_id];  
+                dev.priority = ctrl_data.data.value_int; 
                 ESP_LOGI(TAG, "new device priority recieved"); 
-                break;
+                esp_err_t err = storage->save_device(ctrl_data.device_id, dev);
+                if (err == ESP_OK) ESP_LOGI(TAG, "updated device info into storage");
+                else ESP_LOGE(TAG, "error while updating the priority info into stroage"); 
+                break;}
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
@@ -78,7 +87,8 @@ void HubController::handle_zigbee_events(controller_data &data){
     switch(data.type)
     {
     case DATA_TYPE_DEVICE_JOIN:
-        devices.emplace(data.device_id, device_info{
+        {
+        auto [dev_it, inserted] = devices.emplace(data.device_id, deviceInfo{
             .priority = 0, // this will be taken off
             .online = true,
             .automation_on = true,
@@ -87,11 +97,15 @@ void HubController::handle_zigbee_events(controller_data &data){
         });
         //ESP_LOGI(TAG, "New device received by Hub");
         xQueueSendToBack(ui_queue, &data, 0);
-        break;
+        esp_err_t err = storage->save_device(data.device_id, dev_it->second);
+        if(err == ESP_OK) ESP_LOGI(TAG, "saved device info successfully in memory");
+        else ESP_LOGE(TAG, "error while saving device info"); 
+        break; }
     case DATA_TYPE_DEVICE_LEFT:
         devices.erase(data.device_id);
         //ESP_LOGI(TAG, "Device erased from Hub map.");
         xQueueSendToBack(ui_queue, &data, 0);
+        storage->delete_device_from_memory(data.device_id); 
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
@@ -147,6 +161,13 @@ void HubController::handle_zigbee_events(controller_data &data){
     default:
         ESP_LOGE(TAG, "Controller received unknown zigbee data type."); 
         break;
+    }
+}
+
+void HubController::check_device_map(){
+    ESP_LOGI(TAG, "*****INFO READ FROM MEMROY*****");
+    for (auto &[key, dev] : devices) {
+    printf("Dev id: 0x%016llx, prio: %d, reporting on: %s \n", key, dev.priority, dev.reporting_on ? "YES" : "NO");
     }
 }
 
