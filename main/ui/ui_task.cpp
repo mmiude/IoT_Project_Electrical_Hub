@@ -5,7 +5,7 @@
 #include "screen_manager.h"
 #include "HubControllerEnums.h"
 
-//NOTE; mirrors the dummy task in main.cpp! TODO; working placeholder screens for menus 
+//NOTE; mirrors the dummy task in main.cpp!
 
 static const char *TAG = "UI_TASK";
 
