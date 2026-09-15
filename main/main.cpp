@@ -145,7 +145,7 @@ extern "C" void app_main(void)
         .events = wifi_eg
     };
 
-    xTaskCreate(ui_task, "UI_TASK", 4096, &ui_params, tskIDLE_PRIORITY + 1, NULL); // stack size needs to be WAY bigger in actual impelemntation (using 16384 in my own tests) also priority since touch
+    xTaskCreate(ui_task, "UI_TASK", 16384, &ui_params, tskIDLE_PRIORITY + 1, NULL); // stack size needs to be WAY bigger in actual impelemntation (using 16384 in my own tests) also priority since touch
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, tb_command_q);
 
