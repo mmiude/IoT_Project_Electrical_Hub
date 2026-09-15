@@ -42,7 +42,6 @@ private:
 
     smartPlug* find_plug(uint64_t ieee_addr);
     void check_devices_map(); 
-    void check_plug_initialization(uint64_t ieee_addr, smartPlugInfo &plug); 
     //commands to smart plugs 
     ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep);
     ezb_err_t read_electrical_measurement_values(uint16_t dst_addr, uint8_t dst_ep);

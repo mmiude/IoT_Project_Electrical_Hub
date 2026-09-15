@@ -310,10 +310,6 @@ smartPlug* ZigbeeCoordinator::find_plug(uint64_t ieee_addr){
     return (it != devices.end()) ? &it->second : nullptr; 
 }
 
-void ZigbeeCoordinator::check_plug_initialization(uint64_t ieee_addr, smartPlugInfo &plug){
-    
-}
-
 void ZigbeeCoordinator::check_devices_map() {
     ESP_LOGI(TAG, "*****INFO READ FROM MEMROY*****");
     for (auto &[key, dev] : devices) {

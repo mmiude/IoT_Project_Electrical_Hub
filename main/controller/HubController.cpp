@@ -85,8 +85,7 @@ void HubController::handle_zigbee_events(controller_data &data){
     switch(data.type)
     {
     case DATA_TYPE_DEVICE_JOIN:
-        {
-        auto [dev_it, inserted] = devices.emplace(data.device_id, deviceInfo{
+        devices.emplace(data.device_id, deviceInfo{
             .priority = 0, // this will be taken off
             .online = true,
             .automation_on = true,
@@ -95,10 +94,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         });
         //ESP_LOGI(TAG, "New device received by Hub");
         xQueueSendToBack(ui_queue, &data, 0);
-        //esp_err_t err = storage->save_device(data.device_id, dev_it->second);
-        //if(err == ESP_OK) ESP_LOGI(TAG, "saved device info successfully in memory");
-        //else ESP_LOGE(TAG, "error while saving device info"); 
-        break; }
+        break; 
     case DATA_TYPE_DEVICE_LEFT:
         devices.erase(data.device_id);
         //ESP_LOGI(TAG, "Device erased from Hub map.");
