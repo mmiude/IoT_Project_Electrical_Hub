@@ -136,7 +136,16 @@ extern "C" void app_main(void)
     static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
     static QueueHandle_t uiQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to local ui via this queue.
     static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side 
-    static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
+    //static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
+
+    // needs to be tested with actual zigbee
+    static UiTaskParams ui_params = {
+        .controller_queue = controllerQueue,
+        .ui_queue = uiQueue,
+        .events = wifi_eg
+    };
+
+    xTaskCreate(ui_task, "UI_TASK", 16384, &ui_params, tskIDLE_PRIORITY + 1, NULL); // stack size needs to be WAY bigger in actual impelemntation (using 16384 in my own tests) also priority since touch
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, /*tb_command_q, */controllerQueue);
 
