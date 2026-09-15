@@ -17,6 +17,7 @@ const app = express()
 app.set("view engine", "ejs")
 app.set("views", path.join(__dirname, "views"))
 
+app.use("/static", express.static(path.join(__dirname, "static")))
 app.use(express.json());
 app.use(cookieParser())
 app.use(newSession);
@@ -24,11 +25,11 @@ app.use(newSession);
 app.use("/auth", authenticationRoutes)
 app.use("/api", APIRoutes)
 
-app.get("/", UserLoggedIn, (req, res) => {
+app.get("/", /*UserLoggedIn,*/ (req, res) => {
     // console.log(req.access_token)
-    const data = { user: req.session.name, access_token: req.access_token }
-    // const data = { user: "cool user", access_token: "test_token" }
-    res.render("test", { data })
+    // const data = { user: req.session.name, access_token: req.access_token }
+    const data = { user: "cool user", access_token: "test_token" }
+    res.render("main", { data })
     // res.send(`Logged in as ${req.session.name}`)
 })
 
