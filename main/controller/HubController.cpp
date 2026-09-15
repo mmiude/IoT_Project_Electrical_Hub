@@ -28,7 +28,7 @@ void HubController::run(){
     controller_data ctrl_data;
 
 
-    storage->get_all_devices(devices); 
+    storage->get_all_devices(devices);  // controller probably needs to save only ieee and priority
     if (devices.empty()) ESP_LOGI(TAG, "no device info saved on NVS.");
     else check_device_map();
     
@@ -51,9 +51,7 @@ void HubController::run(){
                 deviceInfo &dev = devices[ctrl_data.device_id];  
                 dev.priority = ctrl_data.data.value_int; 
                 ESP_LOGI(TAG, "new device priority recieved"); 
-                esp_err_t err = storage->save_device(ctrl_data.device_id, dev);
-                if (err == ESP_OK) ESP_LOGI(TAG, "updated device info into storage");
-                else ESP_LOGE(TAG, "error while updating the priority info into stroage"); 
+                storage->save_device(ctrl_data.device_id, dev);
                 break;}
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
@@ -97,9 +95,9 @@ void HubController::handle_zigbee_events(controller_data &data){
         });
         //ESP_LOGI(TAG, "New device received by Hub");
         xQueueSendToBack(ui_queue, &data, 0);
-        esp_err_t err = storage->save_device(data.device_id, dev_it->second);
-        if(err == ESP_OK) ESP_LOGI(TAG, "saved device info successfully in memory");
-        else ESP_LOGE(TAG, "error while saving device info"); 
+        //esp_err_t err = storage->save_device(data.device_id, dev_it->second);
+        //if(err == ESP_OK) ESP_LOGI(TAG, "saved device info successfully in memory");
+        //else ESP_LOGE(TAG, "error while saving device info"); 
         break; }
     case DATA_TYPE_DEVICE_LEFT:
         devices.erase(data.device_id);
@@ -149,6 +147,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr) {
             dev->reporting_on = data.data.flag;
             ESP_LOGI(TAG, "supports reporting %s", data.data.flag ? "YES" : "NO");
+            storage->save_device(data.device_id, *dev); 
         }
         break;
     case DATA_TYPE_SUPPORTS_METERING:
@@ -168,6 +167,7 @@ void HubController::check_device_map(){
     ESP_LOGI(TAG, "*****INFO READ FROM MEMROY*****");
     for (auto &[key, dev] : devices) {
     printf("Dev id: 0x%016llx, prio: %d, reporting on: %s \n", key, dev.priority, dev.reporting_on ? "YES" : "NO");
+    dev.last_seen = 0; 
     }
 }
 
@@ -232,15 +232,12 @@ void HubController::check_thresholds(){
 
         else if (dev.priority == 1) {
             if (current_electricity_price > threshold_low) {
-                if (dev.on) {
-                    plugProtocols.at(ZIGBEE)->set_plug_off(key);
-                    ESP_LOGI(TAG, "setting plug off on threshold check");
-                } 
+                plugProtocols.at(ZIGBEE)->set_plug_off(key);
+                ESP_LOGI(TAG, "setting plug off on threshold check");
+                
             } else {
-                if (!dev.on){
-                    plugProtocols.at(ZIGBEE)->set_plug_on(key);
-                    ESP_LOGI(TAG, "setting plug on on threshold check");
-                } 
+                plugProtocols.at(ZIGBEE)->set_plug_on(key);
+                ESP_LOGI(TAG, "setting plug on on threshold check");
             }
             vTaskDelay(pdMS_TO_TICKS(10));
         }

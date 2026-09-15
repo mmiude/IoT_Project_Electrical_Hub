@@ -38,7 +38,7 @@
 
 static const char *TAG = "MAIN"; 
 
-/*typedef struct {
+typedef struct {
     QueueHandle_t q;
     EventGroupHandle_t events;
 } dummy_task_params;
@@ -123,9 +123,9 @@ void dummy_ui_task(void *params) {
             }
         }
     }
-}*/
+}
 
-void dummy_memory(void *params) {
+/*void dummy_memory(void *params) {
 
     DeviceInfoStorage<smartPlugInfo> storage("test_3", "testing");
 
@@ -205,7 +205,7 @@ void dummy_memory(void *params) {
         err = storage.eares_name_space();  
         ESP_LOGI(TAG, "erasing successfull."); 
     }
-}
+}*/
 
 extern "C" void app_main(void)
 {
@@ -226,17 +226,20 @@ extern "C" void app_main(void)
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
 
+    //coordinatorStorage->eares_name_space();
+    //controllerStorage->eares_name_space(); 
+
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
     };
 
     static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage);
 
-    //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
-    //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
+    static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
+    static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 
-    //xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
-    //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL); 
+    xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL); 
     //xTaskCreate(dummy_memory, "MEMORY_TEST", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {

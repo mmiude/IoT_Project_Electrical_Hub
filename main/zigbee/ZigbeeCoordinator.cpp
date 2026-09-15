@@ -28,9 +28,11 @@ void ZigbeeCoordinator::run(){
     //ESP_LOGW(TAG, "run() event_queue = %p", event_queue_t);
     zigbee_event event;
     // read device info from memory 
-    storage->get_all_devices(devices); 
+    storage->get_all_devices(devices); // add only ieee, short and end point to memory -> ask other stuff once read -> forwards automatically to controller side
     if (devices.empty()) ESP_LOGI(TAG, "no device info saved on NVS.");
-    else check_devices_map();   
+    else check_devices_map();
+    
+    //once we are sure controller has load devices we will send reproting and multiplier requests
     
     while (true) {
         if (xQueueReceive(event_queue_t, &event, portMAX_DELAY) == pdPASS) {
@@ -52,7 +54,6 @@ void ZigbeeCoordinator::run(){
                         read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); 
                         ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_JOIN, .data{}};
                         xQueueSendToBack(controller_queue, &ctrl_data, 0);
-                        save_plug_info(event.ieee_address); 
                     } 
                 } else {
                      ESP_LOGI(TAG, "known plug rejoined");
@@ -75,7 +76,7 @@ void ZigbeeCoordinator::run(){
                 break;
             case ZIGBEE_EVENT_BINDING_SUCCESSFUL:
                 if (plug) {
-                    ESP_LOGI(TAG, "Binding successful for plug: 0x%04hx 0x%016llx. Sending report, multiplier and divioser request.", plug->short_addr, event.ieee_address);
+                    ESP_LOGI(TAG, "Binding successful for plug: 0x%04hx 0x%016llx. Sending configuring reporting.", plug->short_addr, event.ieee_address);
                     esp_zigbee_lock_acquire(portMAX_DELAY);
                     send_configure_reporting(plug->short_addr, plug->endpoint); 
                     esp_zigbee_lock_release();
@@ -201,6 +202,7 @@ void ZigbeeCoordinator::run(){
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING, .data = {.flag = true}};
                     //ctrl_data.data.flag = true;
                     xQueueSend(controller_queue, &ctrl_data, 0);
+                    storage->save_device(event.ieee_address, *plug); 
                 } else ESP_LOGW(TAG, "unknown plug sent state reporting successful signal");
                 break;
             case ZIGBEE_EVENT_STATE_REPORTING_ERROR:
@@ -209,6 +211,7 @@ void ZigbeeCoordinator::run(){
                     ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_REPORTING, .data = {.flag = false}};
                     //ctrl_data.data.flag = false;
                     xQueueSend(controller_queue, &ctrl_data, 0);
+                    storage->save_device(event.ieee_address, *plug);
                 } else ESP_LOGW(TAG, "unknown plug sent state reporing error signal.");
                 break; 
             case ZIGBEE_EVENT_NETWORK_OPEN:
@@ -243,7 +246,7 @@ void ZigbeeCoordinator::request_energy_consumption_values(uint64_t device_id){
 
 void ZigbeeCoordinator::request_electrical_values(uint64_t device_id){
     auto plug = find_plug(device_id);
-    if (plug) {
+    if (plug && plug->supports_electrical_measurement) {
         esp_zigbee_lock_acquire(portMAX_DELAY);
         read_electrical_measurement_values(plug->short_addr, plug->endpoint);
         esp_zigbee_lock_release();
@@ -307,11 +310,8 @@ smartPlug* ZigbeeCoordinator::find_plug(uint64_t ieee_addr){
     return (it != devices.end()) ? &it->second : nullptr; 
 }
 
-void ZigbeeCoordinator::save_plug_info(uint64_t ieee_addr) {
-    auto plug = find_plug(ieee_addr);
-    esp_err_t err = storage->save_device(ieee_addr, *plug); 
-    if (err == ESP_OK) ESP_LOGI(TAG, "saving plug info successfull");
-    else ESP_LOGE(TAG, "error while saving plug info"); 
+void ZigbeeCoordinator::check_plug_initialization(uint64_t ieee_addr, smartPlugInfo &plug){
+    
 }
 
 void ZigbeeCoordinator::check_devices_map() {
