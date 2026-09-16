@@ -14,7 +14,7 @@
 //#define PIN_RST 14
 //#define PIN_BL 15
 
-// lazy lazy lazy
+// meh
 static constexpr gpio_num_t PIN_SCLK = GPIO_NUM_23;
 static constexpr gpio_num_t PIN_MOSI = GPIO_NUM_22;
 static constexpr gpio_num_t PIN_MISO = GPIO_NUM_21;
