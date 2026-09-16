@@ -94,10 +94,17 @@ void display_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map
 
 esp_lcd_panel_io_handle_t display_init(void)
 {
+    /*
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << PIN_RST) | (1ULL << PIN_BL),
         .mode = GPIO_MODE_OUTPUT,
     };
+    */
+
+    gpio_config_t io_conf = {};
+    io_conf.pin_bit_mask = (1ULL << PIN_RST) | (1ULL << PIN_BL);
+    io_conf.mode = GPIO_MODE_OUTPUT;
+
     gpio_config(&io_conf);
     gpio_set_level(PIN_BL, 1);
 

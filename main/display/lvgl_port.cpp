@@ -32,10 +32,17 @@ void lvgl_port_init(void)
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(indev, touch_read_cb);
 
+    /*
     const esp_timer_create_args_t tick_timer_args = {
         .callback = &lvgl_tick_cb,
         .name = "lvgl_tick",
     };
+    */
+
+    esp_timer_create_args_t tick_timer_args = {};
+    tick_timer_args.callback = &lvgl_tick_cb;
+    tick_timer_args.name = "lvgl_tick";
+    
     esp_timer_handle_t tick_timer;
     ESP_ERROR_CHECK(esp_timer_create(&tick_timer_args, &tick_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(tick_timer, 1000));
