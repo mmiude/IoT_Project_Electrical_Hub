@@ -2,6 +2,9 @@
 #define SYSTEMCONFIGSTORAGE_H
 
 #include <string>
+
+#include "esp_log.h"
+#include "esp_err.h"
 #include "NvsStorage.h"
 
 // this is used to save system configuration info including wi-fi ssid and pwd and threshold levels. 
@@ -9,7 +12,7 @@
 class SystemConfigStorage {
 public:
     SystemConfigStorage(std::string name_space = "sys_conf", std::string wifi_ssid_k = "ssid_key", std::string wifi_pwd_k = "pwd_key", std::string threshold_key_med = "t_med_key", std::string threshold_key_low = "t_low_key");
-    ~SystemConfigStorage = default;
+    ~SystemConfigStorage() = default;
 
     esp_err_t save_wifi_info(std::string &ssid, std::string &pwd);
     esp_err_t save_low_threshold(float low_threshold);
@@ -23,6 +26,7 @@ private:
     NvsStorage storage;
     std::string ssid_key;
     std::string pwd_key;
-    std::string threshold_key;
+    std::string med_thres_key;
+    std::string low_thres_key;
 };
 #endif //SYSTEMCONFIGSTORAGE_H
