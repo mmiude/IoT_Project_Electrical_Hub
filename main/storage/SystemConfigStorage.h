@@ -19,8 +19,12 @@ public:
     esp_err_t save_med_threshold(float med_threshold);
 
     esp_err_t get_wifi_info(std::string &ssid, std::string &pwd);
-    esp_err_t get_low_threshold(float &low_threshold); 
-    esp_err_t get_med_threshold(float &med_threshold); 
+    esp_err_t get_threshold_levels(float &low, float &med);
+
+    esp_err_t erase_wifi_info();
+    esp_err_t erase_low_threshold();
+    esp_err_t erase_med_threshold();
+    esp_err_t erase_all_system_config_info();
 
 private:
     NvsStorage storage;

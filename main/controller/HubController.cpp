@@ -4,8 +4,8 @@
 static const char *TAG = "HUB_CONTROLLER"; 
 
 
-HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage) : 
-plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q), storage(dev_stroage) {
+HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage, std::shared_ptr<SystemConfigStorage> config_storage) : 
+plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q), device_info_storage(dev_stroage), system_config_storage(config_storage) {
     timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(15000), pdTRUE, this, dataRequestTimerCallback);
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
@@ -28,9 +28,11 @@ void HubController::run(){
     controller_data ctrl_data;
 
 
-    storage->get_all_devices(devices);  // controller probably needs to save only ieee and priority
+    device_info_storage->get_all_devices(devices); 
     if (devices.empty()) ESP_LOGI(TAG, "no device info saved on NVS.");
     else check_device_map();
+    system_config_storage->get_threshold_levels(threshold_low, threshold_medium); // if there is no values saved these returns zeros 
+    ESP_LOGW(TAG, "read following values low: %f, med: %f", threshold_low, threshold_medium);
     
     while (true) {
 
@@ -41,17 +43,19 @@ void HubController::run(){
                 ESP_LOGI(TAG, "new low threshold received: %.2f.", ctrl_data.data.value);
                 threshold_low = ctrl_data.data.value;
                 check_low_thresholds();
+                system_config_storage->save_low_threshold(ctrl_data.data.value);
                 break;
             case DATA_TYPE_THRESHOLD_MED:
                 ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value); 
                 threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
+                system_config_storage->save_med_threshold(ctrl_data.data.value);
                 break; 
             case DATA_TYPE_PRIORITY: {
                 deviceInfo &dev = devices[ctrl_data.device_id];  
                 dev.priority = ctrl_data.data.value_int; 
                 ESP_LOGI(TAG, "new device priority recieved"); 
-                storage->save_device(ctrl_data.device_id, dev);
+                device_info_storage->save_device(ctrl_data.device_id, dev);
                 break;}
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
@@ -99,7 +103,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         devices.erase(data.device_id);
         //ESP_LOGI(TAG, "Device erased from Hub map.");
         xQueueSendToBack(ui_queue, &data, 0);
-        storage->delete_device_from_memory(data.device_id); 
+        device_info_storage->delete_device_from_memory(data.device_id); 
         break;
     case DATA_TYPE_POWER:
         if (dev != nullptr){
@@ -143,7 +147,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         if (dev != nullptr) {
             dev->reporting_on = data.data.flag;
             ESP_LOGI(TAG, "supports reporting %s", data.data.flag ? "YES" : "NO");
-            storage->save_device(data.device_id, *dev); 
+            device_info_storage->save_device(data.device_id, *dev); 
         }
         break;
     case DATA_TYPE_SUPPORTS_METERING:

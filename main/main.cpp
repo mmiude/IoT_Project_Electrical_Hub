@@ -31,6 +31,7 @@
 
 #include "NvsStorage.h"
 #include "DeviceInfoStorage.h"
+#include "SystemConfigStorage.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -38,7 +39,7 @@
 
 static const char *TAG = "MAIN"; 
 
-typedef struct {
+/*typedef struct {
     QueueHandle_t q;
     EventGroupHandle_t events;
 } dummy_task_params;
@@ -123,89 +124,8 @@ void dummy_ui_task(void *params) {
             }
         }
     }
-}
-
-/*void dummy_memory(void *params) {
-
-    DeviceInfoStorage<smartPlugInfo> storage("test_3", "testing");
-
-    smartPlugInfo plug_1 = {
-        .short_addr = 23,
-        .endpoint = 1, 
-        .supports_metering = true,
-        .supports_electrical_measurement = true,
-        .current_divisor = 1000,
-        .current_multiplier = 1,
-        .voltage_divisor = 1000,
-        .voltage_multiplier = 1,
-        .power_divisor = 1000,
-        .power_multiplier = 1,
-        .summation_divisor = 1000,
-        .summation_multiplier = 1
-    };
-
-    smartPlugInfo plug_2 = {
-        .short_addr = 55,
-        .endpoint = 1, 
-        .supports_metering = false,
-        .supports_electrical_measurement = true,
-        .current_divisor = 1000,
-        .current_multiplier = 1,
-        .voltage_divisor = 1000,
-        .voltage_multiplier = 1,
-        .power_divisor = 1000,
-        .power_multiplier = 1,
-        .summation_divisor = 1000,
-        .summation_multiplier = 1
-    };
-
-    std::map<uint64_t, smartPlugInfo> devices_map; 
-    devices_map.emplace(222, plug_1);
-    devices_map.emplace(333, plug_2);
-
-    std::map<uint64_t, smartPlugInfo> read_device_map;
-
-    while (true) {  
-
-        vTaskDelay(pdMS_TO_TICKS(5000));
-
-        esp_err_t err = storage.get_all_devices(read_device_map);
-        
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "reading successfull.");
-            ESP_LOGI(TAG, "***** INFO *****");
-            for (auto &[key, dev]: read_device_map) {
-                ESP_LOGI(TAG, "key: %llu, short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
-                    key, dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
-            }
-        }
-        
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        ESP_LOGW(TAG, "writing to nvs...");
-        for (auto &[key, dev] : devices_map) {
-            esp_err_t err = storage.save_device(key, dev);
-            if (err == ESP_OK) ESP_LOGI(TAG, "succesfully saved device info from map.");
-        }; 
-
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        ESP_LOGW(TAG, "reading info back");
-        
-        err = storage.get_all_devices(read_device_map);
-        
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "reading successfull.");
-            ESP_LOGI(TAG, "***** INFO *****");
-            for (auto &[key, dev]: read_device_map) {
-                ESP_LOGI(TAG, "key: %llu, short: %d, endpoint: %d, supports metering: %s, power multi: %d", 
-                    key, dev.short_addr, dev.endpoint, dev.supports_metering ? "YES" : "NO", dev.power_multiplier);
-            }
-        }
-        else ESP_LOGE(TAG, "error while reading blob");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        err = storage.eares_name_space();  
-        ESP_LOGI(TAG, "erasing successfull."); 
-    }
 }*/
+
 
 extern "C" void app_main(void)
 {
@@ -219,28 +139,29 @@ extern "C" void app_main(void)
     static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
     static QueueHandle_t uiQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to local ui via this queue.
     static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side 
-    // static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
+    //static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, /*tb_command_q, */controllerQueue);
 
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
+    static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
 
     //coordinatorStorage->eares_name_space();
     //controllerStorage->eares_name_space(); 
+    //sysConfStorage->erase_all_system_config_info();
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
     };
 
-    static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage);
+    static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
 
-    static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
-    static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
+    //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
+    //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 
-    xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL); 
-    //xTaskCreate(dummy_memory, "MEMORY_TEST", 2048, NULL, tskIDLE_PRIORITY + 1, NULL);
+    //xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
+    //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));

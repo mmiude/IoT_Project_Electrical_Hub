@@ -13,10 +13,11 @@
 #include "IDeviceProtocol.h"
 #include "HubControllerEnums.h"
 #include "DeviceInfoStorage.h"
+#include "SystemConfigStorage.h"
 
 class HubController {
 public:
-    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage); 
+    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage, std::shared_ptr<SystemConfigStorage> config_storage); 
 
 private:
     static void dataRequestTimerCallback(TimerHandle_t xTimer); 
@@ -32,7 +33,8 @@ private:
     TaskHandle_t handle; 
     TimerHandle_t timer_handle;
 
-    std::shared_ptr<DeviceInfoStorage<deviceInfo>> storage;
+    std::shared_ptr<DeviceInfoStorage<deviceInfo>> device_info_storage;
+    std::shared_ptr<SystemConfigStorage> system_config_storage;
     std::map<uint64_t, deviceInfo> devices;
     
     float threshold_low;

@@ -31,10 +31,29 @@ esp_err_t SystemConfigStorage::get_wifi_info(std::string &ssid, std::string &pwd
     return storage.read_string(pwd_key, pwd);
 }
 
-esp_err_t SystemConfigStorage::get_low_threshold(float &low_threshold){
-    return storage.read_blob(low_thres_key, low_threshold);
+esp_err_t SystemConfigStorage::get_threshold_levels(float &low, float &med) {
+    esp_err_t err = storage.read_blob(low_thres_key, low);
+    if (err != ESP_OK) return err;
+    return storage.read_blob(med_thres_key, med);
 }
 
-esp_err_t SystemConfigStorage::get_med_threshold(float &med_threshold){
-    return storage.read_blob(low_thres_key, med_threshold);
+esp_err_t SystemConfigStorage::erase_wifi_info(){
+    esp_err_t err = storage.erase_key(ssid_key);
+    if (err != ESP_OK) {
+        ESP_LOGE("CONFIG_STORAGE", "error while erasing ssid from NVS.");
+        return err;
+    }
+    return storage.erase_key(pwd_key);
+} 
+
+esp_err_t SystemConfigStorage::erase_low_threshold(){
+    return storage.erase_key(low_thres_key);
+}
+
+esp_err_t SystemConfigStorage::erase_med_threshold(){
+    return storage.erase_key(med_thres_key);
+}
+
+esp_err_t SystemConfigStorage::erase_all_system_config_info(){
+    return storage.erase_all();
 }
