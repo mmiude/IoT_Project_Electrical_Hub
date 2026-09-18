@@ -79,7 +79,12 @@ void HubController::run(){
                 command_handler(ctrl_data);
                 break;
             case DATA_TYPE_NETWORK_OPEN:
-                ESP_LOGI(TAG, "NETWORK OPEN: %s. Inform leds.", ctrl_data.data.flag ? "YES" : "NO"); 
+                if (ctrl_data.data.flag) notify(Z_NETWORK_OPEN);
+                else notify(Z_NETWORK_CLOSE); 
+                break;
+            case DATA_TYPE_NETOWRK_ALIVE:
+                if (ctrl_data.data.flag) notify(Z_NETWORK_UP);
+                else notify(Z_NETWORK_DOWN);
                 break;
             default:
                 handle_zigbee_events(ctrl_data);

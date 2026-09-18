@@ -1,6 +1,9 @@
 #ifndef LED_H
 #define LED_H
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "Observer.h"
@@ -17,13 +20,14 @@ private:
     gpio_num_t led_yellow;
     gpio_num_t led_red; 
 
-    uint8_t green_state;
-    uint8_t yellow_state;
-    uint8_t red_state; 
+    uint8_t yellow_state; 
 
-    void blink_green(); 
-    void blink_yellow();
-    void blink_red();
+    void set_green(int state);
+    void set_red(int state);
+
+    static void blinkTimerCallback(TimerHandle_t xTimer); 
+
+    TimerHandle_t timer_handle; 
 };
 
 #endif //LED_H

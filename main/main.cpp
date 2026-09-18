@@ -147,6 +147,7 @@ extern "C" void app_main(void)
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
     static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
+    static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
 
     //coordinatorStorage->eares_name_space();
     //controllerStorage->eares_name_space(); 
@@ -157,6 +158,7 @@ extern "C" void app_main(void)
     };
 
     static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
+    controller.attach(leds);
 
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
