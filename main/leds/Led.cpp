@@ -20,6 +20,16 @@ Led::Led(gpio_num_t green_pin, gpio_num_t yellow_pin, gpio_num_t red_pin) : led_
 
 }
 
+void Led::update(int staten) {
+    //if zigee network is up -> green on red off
+
+    //if zigbee network is open -> blink yellow
+
+    //if zigbee network is close -> yello off 
+
+    //if no activity -> red on green off
+}
+
 void Led::blink_green() {
     green_state = !green_state;
     gpio_set_level(led_green, green_state);

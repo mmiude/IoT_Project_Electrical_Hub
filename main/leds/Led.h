@@ -3,15 +3,14 @@
 
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "Observer.h"
 
-class Led {
+class Led : public Observer {
 public:
     Led(gpio_num_t green_pin, gpio_num_t yellow_pin, gpio_num_t red_pin);
     ~Led() = default; 
 
-    void blink_green(); 
-    void blink_yellow();
-    void blink_red();
+    void update(int state) override;
 
 private:
     gpio_num_t led_green;
@@ -21,6 +20,10 @@ private:
     uint8_t green_state;
     uint8_t yellow_state;
     uint8_t red_state; 
+
+    void blink_green(); 
+    void blink_yellow();
+    void blink_red();
 };
 
 #endif //LED_H

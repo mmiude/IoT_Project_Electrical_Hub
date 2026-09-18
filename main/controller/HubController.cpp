@@ -10,6 +10,14 @@ plugProtocols(protocols), event_group(events), controller_queue(controller_q), c
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
 
+void HubController::attach(std::shared_ptr<Observer> obs) {
+    observers.push_back(obs);
+}
+
+void HubController::notify(int state) {
+    for (const auto &o : observers) o->update(state); 
+}
+
 void HubController::runner(void *params){
     auto instance = static_cast<HubController *>(params);
     xEventGroupWaitBits(instance->event_group, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY); // wait until zigbee is ready 

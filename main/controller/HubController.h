@@ -14,10 +14,13 @@
 #include "HubControllerEnums.h"
 #include "DeviceInfoStorage.h"
 #include "SystemConfigStorage.h"
+#include "Subject.h"
 
-class HubController {
+class HubController : public Subject {
 public:
     HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage, std::shared_ptr<SystemConfigStorage> config_storage); 
+
+    void attach(std::shared_ptr<Observer> obs) override; 
 
 private:
     static void dataRequestTimerCallback(TimerHandle_t xTimer); 
@@ -25,6 +28,7 @@ private:
     void run();
 
     std::vector<std::shared_ptr<IDeviceProtocol>> plugProtocols;
+    std::vector<std::shared_ptr<Observer>> observers; 
     EventGroupHandle_t event_group;
     QueueHandle_t controller_queue;
     QueueHandle_t cloud_queue;
@@ -40,6 +44,8 @@ private:
     float threshold_low;
     float threshold_medium; 
     float current_electricity_price; 
+
+    void notify(int state) override; 
     
     void handle_zigbee_events(controller_data &data); 
     void check_low_thresholds();
