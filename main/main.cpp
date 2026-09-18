@@ -31,6 +31,12 @@
 
 #include "ui_task.h"
 
+#include "NvsStorage.h"
+#include "DeviceInfoStorage.h"
+#include "SystemConfigStorage.h"
+#include "Led.h"
+
+
 
 #define UART_PORT_NUM      UART_NUM_0
 #define BUF_SIZE           (1024)
@@ -124,6 +130,8 @@ void dummy_ui_task(void *params) {
     }
 }*/
 
+
+
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -149,17 +157,27 @@ extern "C" void app_main(void)
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, /*tb_command_q, */controllerQueue);
 
+    static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
+    static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
+    static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
+    static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
+
+    //coordinatorStorage->eares_name_space();
+    //controllerStorage->eares_name_space(); 
+    //sysConfStorage->erase_all_system_config_info();
+
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
-        std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg)
+        std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
     };
 
-    static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue);
+    static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
+    controller.attach(leds);
 
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 
     //xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
-    //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL); 
+    //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
