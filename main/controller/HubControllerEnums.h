@@ -10,6 +10,13 @@ enum ProtocolIndex {
 };
 
 typedef enum {
+    Z_NETWORK_OPEN,
+    Z_NETWORK_CLOSE,
+    Z_NETWORK_UP,
+    Z_NETWORK_DOWN
+} z_network_status;
+
+typedef enum {
     TOGGLE_PLUG,
     PLUG_ON,
     PLUG_OFF,
@@ -40,6 +47,7 @@ typedef enum {
     DATA_TYPE_REPORTING,
     DATA_TYPE_SUPPORTS_METERING,
     DATA_TYPE_NETWORK_OPEN,
+    DATA_TYPE_NETOWRK_ALIVE,
     // threshold, priority and electricity price info coming from ui 
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,

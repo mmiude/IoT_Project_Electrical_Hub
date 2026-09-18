@@ -13,6 +13,7 @@ Handles Zigbee network, stack and raw signals.*/
 static const char *TAG = "ZIGBEE_GATWAY";
 
 static QueueHandle_t event_queue = NULL;
+static EventGroupHandle_t event_group = NULL;
 
 QueueHandle_t zigbee_gateway_get_queue()
 {
@@ -151,6 +152,8 @@ static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
 static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) 
 {   
     //Obtains the type of the application signal 
+    //set alive bit here and coordinator will inform controller in case of the bit is not set in time -> zigbee down -> reset -> red LED on! 
+    xEventGroupSetBits(event_group, ZIGBEE_ALIVE_BIT);
     ezb_app_signal_type_t signal_type = ezb_app_signal_get_type(app_signal);
 
     switch (signal_type) {
@@ -435,7 +438,8 @@ static void zcl_core_read_config_report_response(ezb_zcl_cmd_config_report_rsp_m
 static void esp_zigbee_zcl_core_action_handler(ezb_zcl_core_action_callback_id_t callback_id, void *message) {
 
     //ESP_LOGI(TAG, "ZCL action callback ID: 0x%04lx", callback_id);
-    
+    xEventGroupSetBits(event_group, ZIGBEE_ALIVE_BIT);
+
     switch (callback_id) {
 
         case EZB_ZCL_CORE_REPORT_ATTR_CB_ID: //EZB_ZCL_CORE_REPORT_ATTR_CB_ID 
@@ -500,9 +504,9 @@ esp_err_t esp_zigbee_setup_commissioning(void)
 
 void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
 {
-    EventGroupHandle_t events = (EventGroupHandle_t)pvParameters;
+    event_group = (EventGroupHandle_t)pvParameters;
 
-    xEventGroupWaitBits(events, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
+    xEventGroupWaitBits(event_group, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
 
     esp_zigbee_config_t zigbee_config = ESP_ZIGBEE_DEFAULT_CONFIG();
 
@@ -515,7 +519,7 @@ void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
     ESP_ERROR_CHECK(esp_zigbee_start(false));
 
     ESP_LOGI(TAG, "Starting zigbee main task");
-    xEventGroupSetBits(events, ZIGBEE_STACK_READY);
+    xEventGroupSetBits(event_group, ZIGBEE_STACK_READY);
     
     esp_zigbee_launch_mainloop();
 

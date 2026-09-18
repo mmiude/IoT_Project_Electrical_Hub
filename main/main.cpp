@@ -32,6 +32,7 @@
 #include "NvsStorage.h"
 #include "DeviceInfoStorage.h"
 #include "SystemConfigStorage.h"
+#include "Led.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -127,6 +128,7 @@ void dummy_ui_task(void *params) {
 }*/
 
 
+
 extern "C" void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -139,13 +141,13 @@ extern "C" void app_main(void)
     static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
     static QueueHandle_t uiQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to local ui via this queue.
     static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side 
-    //static QueueHandle_t tb_command_q = xQueueCreate(10, sizeof(HubCommand));
 
     CloudCommunication cloud_communication(&ipstack, wifi_eg, /*tb_command_q, */controllerQueue);
 
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
     static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
+    static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
 
     //coordinatorStorage->eares_name_space();
     //controllerStorage->eares_name_space(); 
@@ -156,6 +158,7 @@ extern "C" void app_main(void)
     };
 
     static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
+    controller.attach(leds);
 
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};

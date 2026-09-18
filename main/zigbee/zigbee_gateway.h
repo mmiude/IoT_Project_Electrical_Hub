@@ -8,6 +8,7 @@
 #include "esp_zigbee.h"
 #include "ezbee/zha.h"
 
+#define ZIGBEE_ALIVE_BIT BIT4
 #define ZIGBEE_STACK_READY BIT3
 #define DEVICE_SIGN_READY   BIT2 
 
