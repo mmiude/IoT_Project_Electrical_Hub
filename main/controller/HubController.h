@@ -57,6 +57,9 @@ private:
 
     void check_device_map();
 
+    void modify_dev_priority(uint64_t dev_id, int priority);
+    void modify_dev_automation(uint64_t dev_id, bool state);
+
 };
 
 #endif //HUBCONTROLLER_H

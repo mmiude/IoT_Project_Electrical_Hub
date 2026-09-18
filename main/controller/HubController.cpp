@@ -59,12 +59,13 @@ void HubController::run(){
                 check_medium_thresholds();
                 system_config_storage->save_med_threshold(ctrl_data.data.value);
                 break; 
-            case DATA_TYPE_PRIORITY: {
-                deviceInfo &dev = devices[ctrl_data.device_id];  
-                dev.priority = ctrl_data.data.value_int; 
+            case DATA_TYPE_PRIORITY: 
+                modify_dev_priority(ctrl_data.device_id, ctrl_data.data.value_int);
                 ESP_LOGI(TAG, "new device priority recieved"); 
-                device_info_storage->save_device(ctrl_data.device_id, dev);
-                break;}
+                break;
+            case DATA_TYPE_AUTOMATION:
+                modify_dev_automation(ctrl_data.device_id, ctrl_data.data.flag);
+                break;
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
@@ -85,6 +86,9 @@ void HubController::run(){
             case DATA_TYPE_NETOWRK_ALIVE:
                 if (ctrl_data.data.flag) notify(Z_NETWORK_UP);
                 else notify(Z_NETWORK_DOWN);
+                break;
+            case DATA_TYPE_WIFI_ONLINE:
+                if (!ctrl_data.data.flag) // notify ui -> wi-fi connection lost
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -199,7 +203,7 @@ bool HubController::threshold_allows_opening(int priority) {
 void HubController::check_low_thresholds(){
     ESP_LOGI(TAG, "checking low threshold");
     for (auto &[key, dev] : devices) {
-        if (dev.priority == 1) {
+        if (dev.priority == 1 && dev.automation_on) {
             if (current_electricity_price > threshold_low) {
                 if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
             } else {
@@ -213,7 +217,7 @@ void HubController::check_low_thresholds(){
 void HubController::check_medium_thresholds(){
     ESP_LOGI(TAG, "checking med threshold");
     for (auto &[key, dev] : devices) {
-        if (dev.priority == 2) {
+        if (dev.priority == 2 && dev.automation_on) {
             if (current_electricity_price > threshold_medium) {
                 if (dev.on) plugProtocols.at(ZIGBEE)->set_plug_off(key);
             } else {
@@ -228,7 +232,7 @@ void HubController::check_thresholds(){
     ESP_LOGI(TAG, "checking both thresholds. elec price: %.2f, low: %.2f, med: %.2f", current_electricity_price, threshold_low, threshold_medium);
 
     for (auto &[key, dev] : devices) {
-        if (dev.priority == 2) {
+        if (dev.priority == 2 && dev.automation_on) {
             if (current_electricity_price > threshold_medium) {
                 if (dev.on){
                     plugProtocols.at(ZIGBEE)->set_plug_off(key);
@@ -243,7 +247,7 @@ void HubController::check_thresholds(){
             vTaskDelay(pdMS_TO_TICKS(10));
         }
 
-        else if (dev.priority == 1) {
+        else if (dev.priority == 1 && dev.automation_on) {
             if (current_electricity_price > threshold_low) {
                 plugProtocols.at(ZIGBEE)->set_plug_off(key);
                 ESP_LOGI(TAG, "setting plug off on threshold check");
@@ -277,7 +281,6 @@ void HubController::command_handler(controller_data &data){
             break; 
         case OPEN_NETWORK:
             plugProtocols.at(ZIGBEE)->open_network(); 
-            // notify leds 
             break;
         default:
             ESP_LOGE(TAG, "Unknown command request");
@@ -326,4 +329,22 @@ void HubController::periodic_device_check(){
         } 
         vTaskDelay(pdMS_TO_TICKS(10)); // small delay so Zigbee network won't get angry. 
     }
+}
+
+void HubController::modify_dev_priority(uint64_t dev_id, int priority) {
+    auto it = devices.find(dev_id);
+    if (it != devices.end()) {
+        deviceInfo &dev = it->second; 
+        dev.priority = priority; 
+        device_info_storage->save_device(dev_id, dev);
+    }  else ESP_LOGE(TAG, "dev not found! no priority modified.");
+}
+
+void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
+    auto it = devices.find(dev_id);
+    if (it != devices.end()) {
+        deviceInfo &dev = it->second;
+        dev.automation_on = state; 
+        device_info_storage->save_device(dev_id, dev);
+    } else ESP_LOGE(TAG, "dev not found! no automation flag modified.");
 }

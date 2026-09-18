@@ -36,6 +36,7 @@ void Led::update(int state) {
             break;
         case Z_NETWORK_CLOSE:
             xTimerStop(timer_handle, 0);
+            set_yellow(0);
             break;
         case Z_NETWORK_DOWN:
             set_red(1);
@@ -53,4 +54,8 @@ void Led::set_green(int state) {
 
 void Led::set_red(int state) {
     gpio_set_level(led_red, state); 
+}
+
+void Led::set_yellow(int state) {
+    gpio_set_level(led_yellow, state);
 }
