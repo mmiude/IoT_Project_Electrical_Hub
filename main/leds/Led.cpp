@@ -31,14 +31,11 @@ void Led::update(int state) {
 
     switch(state) {
         case Z_NETWORK_OPEN:
+            set_green(1);
             xTimerStart(timer_handle, 0);
             break;
         case Z_NETWORK_CLOSE:
             xTimerStop(timer_handle, 0);
-            break;
-        case Z_NETWORK_UP:
-            set_green(1);
-            set_red(0);
             break;
         case Z_NETWORK_DOWN:
             set_red(1);

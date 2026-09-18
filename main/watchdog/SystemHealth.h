@@ -21,7 +21,6 @@ private:
     QueueHandle_t controller_queue; 
     TaskHandle_t task_handle; 
 
-    bool z_previous_state; 
 };
 
 #endif //SYSTEMHEALTH_H

@@ -33,6 +33,7 @@
 #include "DeviceInfoStorage.h"
 #include "SystemConfigStorage.h"
 #include "Led.h"
+#include "SystemHealth.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -159,6 +160,8 @@ extern "C" void app_main(void)
 
     static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
     controller.attach(leds);
+
+    static SystemHealth systemHealthMonitor(wifi_eg, controllerQueue); 
 
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
