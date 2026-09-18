@@ -151,6 +151,7 @@ static ezb_err_t zdo_find_smart_plug_device(uint16_t dst_addr)
 static bool esp_zigbee_app_signal_handler(const ezb_app_signal_t *app_signal) 
 {   
     //Obtains the type of the application signal 
+    //set alive bit here and coordinator will inform controller in case of the bit is not set in time -> zigbee down -> reset -> red LED on! 
     ezb_app_signal_type_t signal_type = ezb_app_signal_get_type(app_signal);
 
     switch (signal_type) {
