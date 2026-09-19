@@ -12,5 +12,10 @@ APIRoutes
         res.json({ success: true })
     })
     .get("/get_electricity_prices", GetElectricityPrices)
+    .post("/send_device_data", (req, res) => {
+        console.log(req.headers)
+        console.log(req.body)
+        res.send("OK")
+    })
 
 module.exports = APIRoutes

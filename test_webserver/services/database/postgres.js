@@ -60,6 +60,15 @@ class Postgres {
         if (newUser.count <= 0) return null
         return newUser[0]["id"]
     }
+
+    async put_device_reading(device_id, readings) {
+        await this.sql`
+            INSERT INTO device_readings
+            (device_id, power_W, energy_J, voltage_V, current_A, timeperiod)
+            VALUES
+            (${device_id}, ${readings[0]}, ${readings[1]}, ${readings[2]}, ${readings[3]}, ${new Date()})
+        `
+    }
 }
 
 module.exports = Postgres

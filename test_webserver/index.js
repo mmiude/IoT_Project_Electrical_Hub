@@ -19,6 +19,7 @@ app.set("views", path.join(__dirname, "views"))
 
 app.use("/static", express.static(path.join(__dirname, "static")))
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // support encoded bodies
 app.use(cookieParser())
 app.use(newSession);
 
