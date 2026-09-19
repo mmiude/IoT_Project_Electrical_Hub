@@ -63,17 +63,50 @@ private:
     EventGroupHandle_t wifi_eg;
 
     // QueueHandle_t tb_command_q;
+    QueueHandle_t cloud_control_q;
+    QueueHandle_t cloud_q;
     QueueHandle_t controller_q;
 
-    static void sign_task(void *param);
-    static void tb_read_command_task(void *param);
-    static void get_electricity_price_task(void *param);
+    TimerHandle_t elec_price_req_timer_h;
+    TimerHandle_t cloud_comm_timer_h;
 
+    // uint8_t efuse_mac[6];
+    char efuse_mac[32] = {0};
+    // char hub_jwt[512] = {0};
+    // int jwt_error = -1;
+
+    std::map<std::string, std::string> auth_headers = {};
+    const std::map<std::string, std::string> tb_headers = {
+        { "Host", "api.thingspeak.com" },
+        { "Content-Type", "application/x-www-form-urlencoded" },
+        { "Accept", "*/*" }
+    };
+
+    std::string tb_url;
+    std::string read_http_body;
+
+
+
+    // bool generate_hub_jwt(char *buffer, size_t size);
+
+    static void elec_price_req_timer_cb(TimerHandle_t xTimer);
+    static void cloud_comm_timer_cb(TimerHandle_t xTimer);
+
+    void validate_device();
+    void read_data();
+    void send_data();
+    void get_electricity_price(std::vector<float> &price_vec);
+    
+    static void cloud_task(void *param);
+
+    // static void sign_task(void *param);
+    // static void read_and_send_task(void *param);
+    // static void get_electricity_price_task(void *param);
     // bool parse_talkback_response_json(const char *response, controller_data *ctrl_data);
 
 public:
-    CloudCommunication(IPStack *_ipstack,
-        EventGroupHandle_t _wifi_eg, /*QueueHandle_t _tb_command_q, */QueueHandle_t _controller_q);
+    CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, 
+        QueueHandle_t _cloud_q, QueueHandle_t _controller_q);
 };
 
 #endif

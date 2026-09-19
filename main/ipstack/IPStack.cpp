@@ -138,7 +138,7 @@ void IPStack::wifi_event_handler(void* arg, esp_event_base_t event_base,
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
-        xEventGroupSetBits(ipstack->eg, WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(ipstack->eg, WIFI_CONNECTED_BIT | ON_WIFI_CONNECT_BIT);
     }
 }
 
@@ -248,17 +248,20 @@ bool IPStack::call_http_request(t_http_request req)
 {
     bool success = false;
 
-    switch (req.method)
-    {
-    case HTTP_METHOD_GET:
-        break;
-    case HTTP_METHOD_POST:
-        // esp_http_client_set_header(client, "Content-Type", "application/json");
+    if (req.method == HTTP_METHOD_POST) {
         esp_http_client_set_post_field(*req.client, req.body_data, strlen(req.body_data));
-        break;
-    default:
-        break;
     }
+    // switch (req.method)
+    // {
+    // case HTTP_METHOD_GET:
+    //     break;
+    // case HTTP_METHOD_POST:
+    //     // esp_http_client_set_header(client, "Content-Type", "application/json");
+    //     esp_http_client_set_post_field(*req.client, req.body_data, strlen(req.body_data));
+    //     break;
+    // default:
+    //     break;
+    // }
 
     esp_err_t err = esp_http_client_perform(*req.client);
     if (err == ESP_OK) {
