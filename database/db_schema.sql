@@ -12,13 +12,16 @@ CREATE TABLE "device"(
     CONSTRAINT "device_hub_id_foreign" FOREIGN KEY ("hub_id") REFERENCES "hub"("id")
 );
 
-CREATE TABLE "power_consumption"(
+CREATE TABLE "device_readings"(
     "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "device_id" BIGINT NOT NULL,
-    "consumption_kWh" DOUBLE PRECISION NOT NULL,
-    "timeperiod_from" TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-    "timeperiod_to" TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-    CONSTRAINT "power_consumption_device_id_foreign" FOREIGN KEY ("device_id") REFERENCES "device"("id")
+    "power_w" DOUBLE PRECISION,
+    "energy_J" DOUBLE PRECISION,
+    "voltage_V" DOUBLE PRECISION,
+    "current_A" DOUBLE PRECISION,
+    -- "timeperiod_from" TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    "timeperiod" TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
+    CONSTRAINT "device_readings_device_id_foreign" FOREIGN KEY ("device_id") REFERENCES "device"("id")
 );
 
 CREATE TABLE "hub_user"(
