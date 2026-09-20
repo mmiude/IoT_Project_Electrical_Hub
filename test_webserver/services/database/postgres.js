@@ -61,12 +61,42 @@ class Postgres {
         return newUser[0]["id"]
     }
 
-    async put_device_reading(device_id, readings) {
+    async create_device(device_id, hub_id) {
+        await this.sql`
+            INSERT INTO device
+            (id, hub_id, is_on)
+            VALUES
+            (${device_id}, ${hub_id}, false)
+        `
+    }
+
+    async update_device(device_id, values) {
+        const assignments = [];
+
+        if (values.name !== undefined) assignments.push(`name = '${values.name}'`);
+        if (values.priority !== undefined) assignments.push(`priority = '${values.priority}'`);
+        if (values.is_on !== undefined) assignments.push(`is_on = '${values.is_on}'`);
+
+        // const q = `
+        //     UPDATE device
+        //     SET ${assignments.join(',\n            ')}
+        //     WHERE id = ${device_id}
+        // `;
+        
+        // console.log(q)
+        await this.sql`
+            UPDATE device
+            set name = 'testname'
+            where id = ${device_id}
+        `
+    }
+
+    async put_device_reading(device_id, type, value) {
         await this.sql`
             INSERT INTO device_readings
-            (device_id, power_W, energy_J, voltage_V, current_A, timeperiod)
+            (device_id, type, value, timeperiod)
             VALUES
-            (${device_id}, ${readings[0]}, ${readings[1]}, ${readings[2]}, ${readings[3]}, ${new Date()})
+            (${device_id}, ${type}, ${value}, ${new Date()})
         `
     }
 }
