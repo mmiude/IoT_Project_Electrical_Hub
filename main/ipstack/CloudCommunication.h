@@ -92,7 +92,7 @@ private:
     static void elec_price_req_timer_cb(TimerHandle_t xTimer);
     static void cloud_comm_timer_cb(TimerHandle_t xTimer);
 
-    void validate_device();
+    void validate_hub();
     void read_data();
     void send_data();
     void get_electricity_price(std::vector<float> &price_vec);

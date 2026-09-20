@@ -5,46 +5,82 @@
 #include <cstdlib>
 #include <cerrno>
 #include <charconv>
+#include <string_view>
 
 static const char *TAG = "CloudCommunication";
 
-static std::vector<std::string> split(const std::string& str, char delimiter) {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::stringstream ss(str);
+template <typename T>
+struct normalize_type { using type = T; };
 
-    while (std::getline(ss, token, delimiter)) {
-        tokens.push_back(token);
-    }
+template <> struct normalize_type<std::string> { using type = std::string_view; };
+template <> struct normalize_type<const char*> { using type = std::string_view; };
+template <size_t N> struct normalize_type<char[N]> { using type = std::string_view; };
+template <size_t N> struct normalize_type<const char[N]> { using type = std::string_view; };
 
-    return tokens;
-}
+template <typename T>
+using normalize_type_t = typename normalize_type<std::decay_t<T>>::type;
 
-static std::optional<commands> stringToCommand(const std::string& str) {
-    static const std::unordered_map<std::string, commands> commandMap = {
+template <typename T_return, typename T_param>
+struct EnumTraits;
+
+template <>
+struct EnumTraits<commands, std::string_view> {
+    static const inline std::unordered_map<std::string_view, commands> map = {
         { "TOGGLE_PLUG", commands::TOGGLE_PLUG },
         { "PLUG_ON", commands::PLUG_ON },
         { "PLUG_OFF", commands::PLUG_OFF },
         { "OPEN_NETWORK", commands::OPEN_NETWORK }
     };
+};
 
-    auto it = commandMap.find(str);
-    if (it != commandMap.end()) {
+template <>
+struct EnumTraits<std::string_view, data_type_t> {
+    static const inline std::unordered_map<data_type_t, std::string_view> map = {
+        { data_type_t::DATA_TYPE_DEVICE_JOIN, "DATA_TYPE_DEVICE_JOIN" },
+        { data_type_t::DATA_TYPE_DEVICE_LEFT, "DATA_TYPE_DEVICE_LEFT" },
+        { data_type_t::DATA_TYPE_POWER, "DATA_TYPE_POWER" },
+        { data_type_t::DATA_TYPE_ENERGY, "DATA_TYPE_ENERGY" },
+        { data_type_t::DATA_TYPE_VOLTAGE, "DATA_TYPE_VOLTAGE" },
+        { data_type_t::DATA_TYPE_CURRENT, "DATA_TYPE_CURRENT" },
+        { data_type_t::DATA_TYPE_SET_ON, "DATA_TYPE_SET_ON" },
+        { data_type_t::DATA_TYPE_PRIORITY, "DATA_TYPE_PRIORITY" },
+        { data_type_t::DATA_TYPE_ONLINE_STATE, "DATA_TYPE_ONLINE_STATE" },
+    };
+};
+
+template <typename T_return, typename T_param>
+static std::optional<T_return> convertEnum(const T_param& param) {
+    using NormReturn = normalize_type_t<T_return>;
+    using NormParam  = normalize_type_t<T_param>;
+
+    const auto& map = EnumTraits<NormReturn, NormParam>::map;    
+    NormParam lookup_key = param;
+
+    if (auto it = map.find(lookup_key); it != map.end()) {
         return it->second;
     }
     return std::nullopt;
 }
 
-static std::vector<float> parseElectricityPrices(const std::string& input) {
-    std::vector<float> result;
-    std::stringstream ss(input);
+template <typename T_split>
+static std::vector<T_split> split(const std::string& str, char delimiter) {
+    std::vector<T_split> tokens;
     std::string token;
+    std::stringstream ss(str);
 
-    while (std::getline(ss, token, ',')) {
-        result.push_back(std::stof(token));
+    while (std::getline(ss, token, delimiter)) {
+        if constexpr (std::is_same_v<T_split, std::string>) {
+            tokens.push_back(token);
+        } else {
+            T_split value;
+            std::stringstream token_ss(token);
+            if (token_ss >> value) {
+                tokens.push_back(value);
+            }
+        }
     }
 
-    return result;
+    return tokens;
 }
 
 static bool parse_talkback_response_json(const char *response, controller_data *ctrl_data) {
@@ -56,7 +92,7 @@ static bool parse_talkback_response_json(const char *response, controller_data *
     std::string response_str = response;
 
     std::string json = "";
-    size_t json_start = response_str.find("{"); 
+    size_t json_start = response_str.find("{");
     size_t json_end = response_str.rfind("}");
     if (json_start == std::string::npos || json_end == std::string::npos) return false;
 
@@ -71,12 +107,14 @@ static bool parse_talkback_response_json(const char *response, controller_data *
         if (tokens[i].type == JSMN_STRING) {
             std::string json_val = json.substr(tokens[i].start, tokens[i].end - tokens[i].start);
             if (json_val.find(command) != std::string::npos) {
-                auto parsed_cmd = split(json_val.substr(strlen(command)), '|');
+                auto parsed_cmd = split<std::string>(json_val.substr(strlen(command)), '|');
                 size_t cmd_size = parsed_cmd.size();
 
                 if (cmd_size < 1) return false;
 
-                auto command = stringToCommand(parsed_cmd[0]);
+                // auto command = stringToCommand(parsed_cmd[0]);
+                // std::string str_command = parsed_cmd[0];
+                auto command = convertEnum<commands>(parsed_cmd[0]);
                 if (command.has_value()) {
                     ctrl_data->data.command = command.value();
                 } else {
@@ -89,7 +127,7 @@ static bool parse_talkback_response_json(const char *response, controller_data *
                 uint64_t device_id = 0;
                 auto [ptr, ec] = std::from_chars(device_id_str.data(),
                     device_id_str.data() + device_id_str.size(), device_id);
-                
+
                 if (ec == std::errc{}) {
                     ctrl_data->device_id = device_id;
                     return true;
@@ -137,19 +175,8 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wi
     cloud_comm_timer_h = xTimerCreate("CLOUD_COMM", pdMS_TO_TICKS(5000), pdTRUE,
         static_cast<void*>(this), cloud_comm_timer_cb);
 
-    
     xTaskCreate(cloud_task, "CLOUD_TASK", 4096, static_cast<void*>(this),
         tskIDLE_PRIORITY + 1, NULL);
-
-
-    // xTaskCreate(sign_task, "SIGN_TASK", 4096, static_cast<void*>(this),
-    //     tskIDLE_PRIORITY + 2, NULL);
-
-    // xTaskCreate(read_and_send_task, "R_AND_S_TASK", 4096, static_cast<void*>(this),
-    //     tskIDLE_PRIORITY + 1, NULL);
-
-    // xTaskCreate(get_electricity_price_task, "EP_TASK", 3072, static_cast<void*>(this),
-    //     tskIDLE_PRIORITY + 1, NULL);
 }
 
 void CloudCommunication::elec_price_req_timer_cb(TimerHandle_t xTimer)
@@ -172,7 +199,7 @@ void CloudCommunication::cloud_task(void *param)
     auto cloud_communication = static_cast<CloudCommunication*>(param);
 
     // if (ipstack)
-    // cloud_communication->validate_device();
+    // cloud_communication->validate_hub();
 
     xTimerStart(cloud_communication->cloud_comm_timer_h, 0);
     xTimerStart(cloud_communication->elec_price_req_timer_h, 0);
@@ -192,7 +219,7 @@ void CloudCommunication::cloud_task(void *param)
         EventBits_t bits = xEventGroupGetBits(cloud_communication->wifi_eg);
         if (bits & ON_WIFI_CONNECT_BIT) {
             ESP_LOGI(TAG, "Wifi connection detected.");
-            cloud_communication->validate_device();
+            cloud_communication->validate_hub();
             cloud_communication->get_electricity_price(price_vec);
             xEventGroupClearBits(cloud_communication->wifi_eg, ON_WIFI_CONNECT_BIT);
         }
@@ -210,7 +237,7 @@ void CloudCommunication::cloud_task(void *param)
     }
 }
 
-void CloudCommunication::validate_device()
+void CloudCommunication::validate_hub()
 {
     if (auth_headers.empty()) {
         ESP_LOGI(TAG, "No auth headers found");
@@ -235,9 +262,9 @@ void CloudCommunication::validate_device()
 
     // Memory cleanup
     free(buffer);
-            
+
     if (success) {
-        ESP_LOGI(TAG, "Go to: http://%s:%d/register_hub\nAnd enter code: %s\nTo register hub.", 
+        ESP_LOGI(TAG, "Go to: http://%s:%d/register_hub\nAnd enter code: %s\nTo register hub.",
             API_HOSTNAME, API_PORT, efuse_mac);
     } else {
         ESP_LOGI(TAG, "Error :(");
@@ -252,13 +279,28 @@ void CloudCommunication::send_data()
     }
 
     ESP_LOGI(TAG, "Sending data...");
+
+    // std::ostringstream send_http_body_ss;
+    // send_http_body_ss << "{ "
+
+    // while (xQueueReceive(cloud_q, &ctrl_data, 0) == pdTRUE) {
+
+    // }
+
     controller_data ctrl_data;
     if (xQueueReceive(cloud_q, &ctrl_data, pdMS_TO_TICKS(500)) == pdTRUE) {
+        auto data_type_str = convertEnum<std::string_view>(ctrl_data.type);
+        if (!data_type_str.has_value()) {
+            ESP_LOGI(TAG, "Invalid datatype");
+            return;
+        }
+
         std::ostringstream send_http_body_ss;
         send_http_body_ss << "device_id=" << ctrl_data.device_id
-                    << "&type=" << ctrl_data.type
+                    << "&type=" << data_type_str.value()
                     << "&value=" << ctrl_data.data.value
-                    << "&value_int=" << ctrl_data.data.value_int;
+                    << "&value_int=" << ctrl_data.data.value_int
+                    << "&flag=" << ctrl_data.data.flag;
         auto send_http_body = send_http_body_ss.str();
         // ESP_LOGI(TAG, "%s: %s", pcName, send_http_body.c_str());
 
@@ -290,26 +332,6 @@ void CloudCommunication::read_data()
     }
 
     ESP_LOGI(TAG, "Fetching tb command...");
-
-// int url_size = std::snprintf(nullptr, 0, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
-// if (url_size <= 0) {
-//     // sending = true;
-//     xSemaphoreGive(cloud_communication->ipstack_mtx);
-//     continue;
-// }
-
-// std::string tb_url(url_size, '\0');
-// std::snprintf(&tb_url[0], url_size + 1, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
-
-// std::ostringstream http_body_ss;
-// http_body_ss << "api_key=" << THINGSPEAK_TB_API_KEY;
-// auto http_body = http_body_ss.str();
-
-// std::map<std::string, std::string> tb_headers = {
-//     { "Host", "api.thingspeak.com" },
-//     { "Content-Type", "application/x-www-form-urlencoded" },
-//     { "Accept", "*/*" }
-// };
 
     char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
     if (!buffer) {
@@ -352,7 +374,8 @@ void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
 
         if (success) {
             std::string prices = buffer;
-            price_vec = parseElectricityPrices(prices);
+            // price_vec = parseElectricityPrices(prices);
+            price_vec = split<float>(prices, ',');
 
             ESP_LOGI(TAG, "Got electricity prices for the next %d 15mins", price_vec.size());
 
