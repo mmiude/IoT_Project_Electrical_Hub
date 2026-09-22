@@ -16,8 +16,7 @@ void SystemHealth::runner(void *params) {
 void SystemHealth::run() {
     controller_data ctrl_data;
     TickType_t last_check_time = xTaskGetTickCount();
-
-    const EventBits_t ALL_GOOD_BITS = ZIGBEE_ALIVE_BIT; // then we would add here | WI_FI_ALIVE_BIT and so on...
+    
     while (true) {
 
         EventBits_t bits = xEventGroupClearBits(events, ZIGBEE_ALIVE_BIT);
