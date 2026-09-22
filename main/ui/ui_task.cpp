@@ -23,8 +23,8 @@ void UiTask::run() {
 
     ui_model.load(); // named devices from nvs, before the screens are built so they can show them
     lvgl_port_init();
-    screen_manager_init();
-    
+    screen_manager_init(ui_model);
+
     ui_model.request_sync(); // controller replays thresholds, price and device states
 
     controller_data msg;
