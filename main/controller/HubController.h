@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <ranges>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -51,7 +52,7 @@ private:
     void handle_zigbee_events(controller_data &data); 
     void check_low_thresholds();
     void check_medium_thresholds();
-    void check_thresholds();
+    //void check_thresholds();
     bool threshold_allows_opening(int priority);
     void command_handler(controller_data &data);
     void periodic_device_check();
@@ -61,6 +62,9 @@ private:
     bool push_to_ui(controller_data &data);
 
     void check_device_map();
+
+    void modify_dev_priority(uint64_t dev_id, int priority);
+    void modify_dev_automation(uint64_t dev_id, bool state);
 
 };
 

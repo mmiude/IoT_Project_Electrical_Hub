@@ -24,6 +24,7 @@ private:
 
     void set_green(int state);
     void set_red(int state);
+    void set_yellow(int state);
 
     static void blinkTimerCallback(TimerHandle_t xTimer); 
 

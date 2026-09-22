@@ -26,8 +26,6 @@ void ZigbeeCoordinator::run(){
     ESP_LOGI(TAG, "Starting the coordinator task");
     //if (event_queue_t == NULL) ESP_LOGE(TAG, "QUEUE NOT INITIALIZED!");
     zigbee_event event;
-    TickType_t last_check_time = xTaskGetTickCount(); 
-
     // read device info from memory 
     storage->get_all_devices(devices); 
     if (devices.empty()) ESP_LOGI(TAG, "no device info saved on NVS.");
@@ -230,24 +228,6 @@ void ZigbeeCoordinator::run(){
                 break;
             }
         }
-        if (xTaskGetTickCount() - last_check_time >= pdMS_TO_TICKS(30000)){ // this will be removed -> make a systemHealthClass aka watchdog! 
-            ESP_LOGI(TAG, "checking zigbee aliveness...");
-            EventBits_t bits = xEventGroupWaitBits(event_group, ZIGBEE_ALIVE_BIT, pdTRUE, pdFALSE, 0);
-            controller_data info;
-            if ((bits & ZIGBEE_ALIVE_BIT) != 0) {
-                ESP_LOGI(TAG, "Zigbee alive");
-                info.type = DATA_TYPE_NETOWRK_ALIVE;
-                info.device_id = 0;
-                info.data.flag = true;
-            } else {
-                ESP_LOGE(TAG, "Zigbee dead!"); 
-                info.type = DATA_TYPE_NETOWRK_ALIVE;
-                info.device_id = 0; 
-                info.data.flag = false; 
-            }
-            xQueueSendToBack(controller_queue, &info, 0); 
-            last_check_time = xTaskGetTickCount();
-        } // we check zigbee alive bit and reset the bit once read -> if not set send ZIGBEE_DOWN_TYPE  
     }
 }
 
