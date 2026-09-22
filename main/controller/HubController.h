@@ -41,9 +41,10 @@ private:
     std::shared_ptr<SystemConfigStorage> system_config_storage;
     std::map<uint64_t, deviceInfo> devices;
     
-    float threshold_low;
-    float threshold_medium; 
-    float current_electricity_price; 
+    float threshold_low{};
+    float threshold_medium{}; 
+    float current_electricity_price{};
+    bool price_received{false};
 
     void notify(int state) override; 
     
@@ -54,6 +55,10 @@ private:
     bool threshold_allows_opening(int priority);
     void command_handler(controller_data &data);
     void periodic_device_check();
+
+    // ui shit
+    void send_ui_sync();
+    bool push_to_ui(controller_data &data);
 
     void check_device_map();
 

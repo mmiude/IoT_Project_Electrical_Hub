@@ -58,7 +58,11 @@ typedef enum {
     // internal for controller - periodic info request from plugs
     DATA_TYPE_REQUEST_ELEC_VALUES,
     // for ui to recieve online info
-    DATA_TYPE_ONLINE_STATE
+    DATA_TYPE_ONLINE_STATE,
+    // ui <-> controller state sync. ui asks once after it has started, controller replays its state to the ui
+    // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
+    DATA_TYPE_UI_SYNC_REQUEST,
+    DATA_TYPE_UI_SYNC_DONE
 } data_type_t;
 
 typedef struct controller_queue_info {
