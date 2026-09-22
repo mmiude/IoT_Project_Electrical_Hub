@@ -41,7 +41,7 @@
 
 static const char *TAG = "MAIN"; 
 
-typedef struct {
+/*typedef struct {
     QueueHandle_t q;
     EventGroupHandle_t events;
 } dummy_task_params;
@@ -126,7 +126,7 @@ void dummy_ui_task(void *params) {
             }
         }
     }
-}
+}*/
 
 
 
@@ -163,11 +163,11 @@ extern "C" void app_main(void)
 
     static SystemHealth systemHealthMonitor(wifi_eg, controllerQueue); 
 
-    static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
-    static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
+    //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
+    //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 
-    xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
-    xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL);
+    //xTaskCreate(dummy_task, "DUMMY", 1024, &parameters, tskIDLE_PRIORITY + 1, NULL);
+    //xTaskCreate(dummy_ui_task, "DUMMY 2", 2048, &params, tskIDLE_PRIORITY + 1, NULL);
     
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
