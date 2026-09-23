@@ -153,9 +153,10 @@ extern "C" void app_main(void)
     static auto uiStorage = std::make_shared<DeviceInfoStorage<UiDeviceRecord>>("ui_ns", "ui_dev_info");
     static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
 
-    //coordinatorStorage->eares_name_space();
-    //controllerStorage->eares_name_space(); 
+    //coordinatorStorage->erase_name_space();
+    //controllerStorage->erase_name_space();
     //sysConfStorage->erase_all_system_config_info();
+    //uiStorage->erase_name_space();
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
