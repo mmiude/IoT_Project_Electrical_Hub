@@ -10,30 +10,16 @@ namespace {
 constexpr uint32_t CHIP_BG = 0x262626;
 constexpr uint32_t CARD_BG = 0x262626;
 constexpr uint32_t PRICE_COLOR = 0x4CAF50;
-constexpr uint32_t THRESHOLD_COLOR = 0xE53935;
 constexpr uint32_t USAGE_COLOR = 0xFB8C00;
 constexpr uint32_t SWITCH_ON_COLOR = 0x4CAF50;
 
-// a live device list below. home screen implements UiModelListener and is kept as a function
+// a live device list below 
+
+// home screen implements UiModelListener and is kept as a function
 // local static in create_home_screen() -> it (and every lv_obj_t it owns) lives for as long as
-// the app runs, same as the other screens (screen_manager never destroys a screen, just hides it)
+// the app runs, same as the other screens (screen_manager never destroys a screen, just hides it) this is better imo
 
-
-// priority ints match HubController 1 = cut off first (uses
-// threshold_low), 2 = cut off later (uses threshold_medium), anything else (0 today) is never
-// turned off automatically.
-
-// we should maybe add a slider for both low and medium thresholds? it would make more sense imo
-// low is displayed on the home screen
-
-const char *priority_label(int priority)
-{
-    switch (priority) {
-        case 1: return "Low";
-        case 2: return "Medium";
-        default: return "Critical";
-    }
-}
+// threshold chip shows both cutoffs now (settings will have both sliders)
 
 class HomeScreen : public UiModelListener {
 public:
@@ -59,7 +45,8 @@ private:
     void on_price_changed(float price) override;
     void on_thresholds_changed(float low, float med) override;
 
-    lv_obj_t *build_chip(lv_obj_t *parent, int x, const char *label, uint32_t value_color, lv_obj_t **out_value);
+    lv_obj_t *build_chip(lv_obj_t *parent, int x, int width, const char *label, uint32_t value_color, lv_obj_t **out_value);
+    void build_threshold_chip(lv_obj_t *parent, int x, int width);
     void build_row(uint64_t id, const UiDevice &dev);
     void apply_row(DeviceRow &row, const UiDevice &dev);
     void refresh_usage();
@@ -75,7 +62,8 @@ private:
     lv_obj_t *device_list{};
     lv_obj_t *empty_label{};
     lv_obj_t *price_value{};
-    lv_obj_t *threshold_value{};
+    lv_obj_t *threshold_low_value{};
+    lv_obj_t *threshold_med_value{};
     lv_obj_t *usage_value{};
 
     std::map<uint64_t, DeviceRow> rows;
@@ -99,10 +87,10 @@ void HomeScreen::switch_event_cb(lv_event_t *e)
     ctx->screen->model->set_plug(ctx->device_id, on);
 }
 
-lv_obj_t *HomeScreen::build_chip(lv_obj_t *parent, int x, const char *label, uint32_t value_color, lv_obj_t **out_value)
+lv_obj_t *HomeScreen::build_chip(lv_obj_t *parent, int x, int width, const char *label, uint32_t value_color, lv_obj_t **out_value)
 {
     lv_obj_t *chip = lv_obj_create(parent);
-    lv_obj_set_size(chip, 104, 54);
+    lv_obj_set_size(chip, width, 54);
     lv_obj_align(chip, LV_ALIGN_LEFT_MID, x, 0);
     lv_obj_set_style_bg_color(chip, lv_color_hex(CHIP_BG), 0);
     lv_obj_set_style_radius(chip, 10, 0);
@@ -122,6 +110,46 @@ lv_obj_t *HomeScreen::build_chip(lv_obj_t *parent, int x, const char *label, uin
 
     if (out_value) *out_value = val;
     return chip;
+}
+
+void HomeScreen::build_threshold_chip(lv_obj_t *parent, int x, int width)
+{
+    lv_obj_t *chip = lv_obj_create(parent);
+    lv_obj_set_size(chip, width, 54);
+    lv_obj_align(chip, LV_ALIGN_LEFT_MID, x, 0);
+    lv_obj_set_style_bg_color(chip, lv_color_hex(CHIP_BG), 0);
+    lv_obj_set_style_radius(chip, 10, 0);
+    lv_obj_set_style_border_width(chip, 0, 0);
+    lv_obj_set_style_pad_all(chip, 6, 0);
+    lv_obj_clear_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *value_row = lv_obj_create(chip);
+    lv_obj_set_size(value_row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(value_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(value_row, 0, 0);
+    lv_obj_set_style_pad_all(value_row, 0, 0);
+    lv_obj_clear_flag(value_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(value_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(value_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(value_row, 3, 0);
+    lv_obj_align(value_row, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    threshold_low_value = lv_label_create(value_row);
+    lv_label_set_text(threshold_low_value, "--");
+    lv_obj_set_style_text_color(threshold_low_value, lv_color_hex(priority_color(1)), 0);
+
+    lv_obj_t *sep = lv_label_create(value_row);
+    lv_label_set_text(sep, "/");
+    lv_obj_set_style_text_color(sep, lv_color_hex(0x666666), 0);
+
+    threshold_med_value = lv_label_create(value_row);
+    lv_label_set_text(threshold_med_value, "--");
+    lv_obj_set_style_text_color(threshold_med_value, lv_color_hex(priority_color(2)), 0);
+
+    lv_obj_t *lbl = lv_label_create(chip);
+    lv_label_set_text(lbl, "Threshold");
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0x999999), 0);
+    lv_obj_align(lbl, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 }
 
 void HomeScreen::build_row(uint64_t id, const UiDevice &dev)
@@ -173,7 +201,7 @@ void HomeScreen::apply_row(DeviceRow &row, const UiDevice &dev)
     if (dev.on) lv_obj_add_state(row.sw, LV_STATE_CHECKED);
     else lv_obj_clear_state(row.sw, LV_STATE_CHECKED);
 
-    // offline devices should just dim for now
+    // offline devices should just dim for now!
     lv_obj_set_style_opa(row.container, dev.online ? LV_OPA_COVER : LV_OPA_50, 0);
 }
 
@@ -197,10 +225,12 @@ void HomeScreen::refresh_price_text()
 
 void HomeScreen::refresh_threshold_text()
 {
-    // shows low threshold
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%.1f c/kWh", model->threshold_low());
-    lv_label_set_text(threshold_value, buf);
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%.1f", model->threshold_low());
+    lv_label_set_text(threshold_low_value, buf);
+
+    snprintf(buf, sizeof(buf), "%.1f", model->threshold_medium());
+    lv_label_set_text(threshold_med_value, buf);
 }
 
 void HomeScreen::update_empty_state()
@@ -263,9 +293,9 @@ lv_obj_t *HomeScreen::build(UiModel &m)
     lv_obj_set_style_pad_all(top_bar, 0, 0);
     lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
 
-    build_chip(top_bar, 0, "Price", PRICE_COLOR, &price_value);
-    build_chip(top_bar, 112, "Threshold", THRESHOLD_COLOR, &threshold_value);
-    build_chip(top_bar, 224, "Usage", USAGE_COLOR, &usage_value);
+    build_chip(top_bar, 0, 104, "Price", PRICE_COLOR, &price_value);
+    build_threshold_chip(top_bar, 112, 130);
+    build_chip(top_bar, 250, 104, "Usage", USAGE_COLOR, &usage_value);
 
     lv_obj_t *add_btn = create_icon_button(top_bar, LV_SYMBOL_PLUS, 0x333333);
     lv_obj_align(add_btn, LV_ALIGN_RIGHT_MID, -44, 0);
