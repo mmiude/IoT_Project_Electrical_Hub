@@ -349,7 +349,7 @@ void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
 
 // ------ ui 
 
-// short timeout (unlike the normal 0) because the sync burst can be bigger than what the ui queue holds and the ui is draining it 
+// short timeout 
 bool HubController::push_to_ui(controller_data &data){
     return xQueueSendToBack(ui_queue, &data, pdMS_TO_TICKS(50)) == pdPASS;
 }
@@ -381,7 +381,7 @@ void HubController::send_ui_sync(){
         ok &= push_to_ui(msg);
     }
 
-    // ui removes devices it knows about but are missing from the replay, so only say done if nothing got dropped
+    //  ui removes devices it knows about but are missing from the replay, so only say done if nothing got dropped
     if (ok) {
         msg = {.type = DATA_TYPE_UI_SYNC_DONE, .data = {}};
         push_to_ui(msg);
