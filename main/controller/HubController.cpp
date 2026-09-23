@@ -281,7 +281,7 @@ void HubController::command_handler(controller_data &data){
             plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id);
             break; 
         case OPEN_NETWORK:
-            plugProtocols.at(ZIGBEE)->open_network(); 
+            plugProtocols.at(ZIGBEE)->open_network();
             break;
         default:
             ESP_LOGE(TAG, "Unknown command request");
@@ -341,7 +341,7 @@ void HubController::modify_dev_priority(uint64_t dev_id, int priority) {
 void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
     auto it = devices.find(dev_id);
     if (it != devices.end()) {
-        it->second.automation_on = state; 
+        it->second.automation_on = state;
         device_info_storage->save_device(it->first, it->second);
     } else ESP_LOGE(TAG, "dev not found! no automation flag modified.");
 }
