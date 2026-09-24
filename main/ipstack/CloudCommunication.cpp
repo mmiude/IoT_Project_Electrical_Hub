@@ -83,60 +83,60 @@ static std::vector<T_split> split(const std::string& str, char delimiter) {
     return tokens;
 }
 
-static bool parse_talkback_response_json(const char *response, controller_data *ctrl_data) {
-    if (!response || !ctrl_data) return false;
+// static bool parse_talkback_response_json(const char *response, controller_data *ctrl_data) {
+//     if (!response || !ctrl_data) return false;
 
-    jsmn_parser parser;
-    jsmn_init(&parser);
+//     jsmn_parser parser;
+//     jsmn_init(&parser);
 
-    std::string response_str = response;
+//     std::string response_str = response;
 
-    std::string json = "";
-    size_t json_start = response_str.find("{");
-    size_t json_end = response_str.rfind("}");
-    if (json_start == std::string::npos || json_end == std::string::npos) return false;
+//     std::string json = "";
+//     size_t json_start = response_str.find("{");
+//     size_t json_end = response_str.rfind("}");
+//     if (json_start == std::string::npos || json_end == std::string::npos) return false;
 
-    json = response_str.substr(json_start, json_end - json_start + 1);
-    jsmntok_t tokens[JSMN_TOKENS_SIZE];
-    int r = jsmn_parse(&parser, json.c_str(), json.size(), tokens, JSMN_TOKENS_SIZE);
-    if (r < 0) return false;
+//     json = response_str.substr(json_start, json_end - json_start + 1);
+//     jsmntok_t tokens[JSMN_TOKENS_SIZE];
+//     int r = jsmn_parse(&parser, json.c_str(), json.size(), tokens, JSMN_TOKENS_SIZE);
+//     if (r < 0) return false;
 
-    const char command[] = "HUB_COMMAND|";
+//     const char command[] = "HUB_COMMAND|";
 
-    for (int i = 0; i < JSMN_TOKENS_SIZE; i++) {
-        if (tokens[i].type == JSMN_STRING) {
-            std::string json_val = json.substr(tokens[i].start, tokens[i].end - tokens[i].start);
-            if (json_val.find(command) != std::string::npos) {
-                auto parsed_cmd = split<std::string>(json_val.substr(strlen(command)), '|');
-                size_t cmd_size = parsed_cmd.size();
+//     for (int i = 0; i < JSMN_TOKENS_SIZE; i++) {
+//         if (tokens[i].type == JSMN_STRING) {
+//             std::string json_val = json.substr(tokens[i].start, tokens[i].end - tokens[i].start);
+//             if (json_val.find(command) != std::string::npos) {
+//                 auto parsed_cmd = split<std::string>(json_val.substr(strlen(command)), '|');
+//                 size_t cmd_size = parsed_cmd.size();
 
-                if (cmd_size < 1) return false;
+//                 if (cmd_size < 1) return false;
 
-                // auto command = stringToCommand(parsed_cmd[0]);
-                // std::string str_command = parsed_cmd[0];
-                auto command = convertEnum<commands>(parsed_cmd[0]);
-                if (command.has_value()) {
-                    ctrl_data->data.command = command.value();
-                } else {
-                    return false;
-                }
+//                 // auto command = stringToCommand(parsed_cmd[0]);
+//                 // std::string str_command = parsed_cmd[0];
+//                 auto command = convertEnum<commands>(parsed_cmd[0]);
+//                 if (command.has_value()) {
+//                     ctrl_data->data.command = command.value();
+//                 } else {
+//                     return false;
+//                 }
 
-                if (cmd_size < 2) return true;
+//                 if (cmd_size < 2) return true;
 
-                auto device_id_str = parsed_cmd[1];
-                uint64_t device_id = 0;
-                auto [ptr, ec] = std::from_chars(device_id_str.data(),
-                    device_id_str.data() + device_id_str.size(), device_id);
+//                 auto device_id_str = parsed_cmd[1];
+//                 uint64_t device_id = 0;
+//                 auto [ptr, ec] = std::from_chars(device_id_str.data(),
+//                     device_id_str.data() + device_id_str.size(), device_id);
 
-                if (ec == std::errc{}) {
-                    ctrl_data->device_id = device_id;
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
+//                 if (ec == std::errc{}) {
+//                     ctrl_data->device_id = device_id;
+//                     return true;
+//                 }
+//             }
+//         }
+//     }
+//     return false;
+// }
 
 
 CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wifi_eg,
@@ -160,20 +160,26 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wi
         }
     }
 
-    int url_size = std::snprintf(nullptr, 0, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
-    if (url_size > 0) {
-        tb_url.resize(static_cast<size_t>(url_size));
-        std::snprintf(tb_url.data(), tb_url.size() + 1, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
-    }
+    // int url_size = std::snprintf(nullptr, 0, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
+    // if (url_size > 0) {
+    //     tb_url.resize(static_cast<size_t>(url_size));
+    //     std::snprintf(tb_url.data(), tb_url.size() + 1, THINGSPEACK_TB_URL, THINGSPEAK_TB_ID);
+    // }
 
-    std::ostringstream read_http_body_ss;
-    read_http_body_ss << "api_key=" << THINGSPEAK_TB_API_KEY;
-    read_http_body = read_http_body_ss.str();
+    // std::ostringstream read_http_body_ss;
+    // read_http_body_ss << "api_key=" << THINGSPEAK_TB_API_KEY;
+    // read_http_body = read_http_body_ss.str();
+
+    std::ostringstream ws_url_ss;
+    ws_url_ss << "ws://" << API_HOSTNAME
+            << ":" << WS_PORT
+            << "/ws?hub=" << efuse_mac;
+    ws_url = ws_url_ss.str();
 
     elec_price_req_timer_h = xTimerCreate("ELEC_PRICE_REQ", pdMS_TO_TICKS(15 * MINUTE_TO_MS), pdTRUE,
         static_cast<void*>(this), elec_price_req_timer_cb);
     cloud_comm_timer_h = xTimerCreate("CLOUD_COMM", pdMS_TO_TICKS(5000), pdTRUE,
-        static_cast<void*>(this), cloud_comm_timer_cb);
+        static_cast<void*>(this), send_data_timer_cb);
 
     xTaskCreate(cloud_task, "CLOUD_TASK", 4096, static_cast<void*>(this),
         tskIDLE_PRIORITY + 1, NULL);
@@ -185,7 +191,7 @@ void CloudCommunication::elec_price_req_timer_cb(TimerHandle_t xTimer)
     int i = 0;
     xQueueSendToBack(cloud_communication->cloud_control_q, &i, 0);
 }
-void CloudCommunication::cloud_comm_timer_cb(TimerHandle_t xTimer)
+void CloudCommunication::send_data_timer_cb(TimerHandle_t xTimer)
 {
     auto cloud_communication = static_cast<CloudCommunication*>(pvTimerGetTimerID(xTimer));
     int i = 1;
@@ -197,6 +203,7 @@ void CloudCommunication::cloud_task(void *param)
     ESP_LOGI(TAG, "Cloud task started");
 
     auto cloud_communication = static_cast<CloudCommunication*>(param);
+    auto ipstack = cloud_communication->ipstack;
 
     // if (ipstack)
     // cloud_communication->validate_hub();
@@ -207,30 +214,33 @@ void CloudCommunication::cloud_task(void *param)
     std::vector<float> price_vec;
     // cloud_communication->get_electricity_price(price_vec);
 
-    bool sending = false;
+    // bool sending = false;
     int action;
     while (true) {
         if (!cloud_communication->ipstack->wait_for_wifi()) {
             ESP_LOGE(TAG, "No wifi");
             continue;
         }
-        sending = !sending;
+        // sending = !sending;
 
         EventBits_t bits = xEventGroupGetBits(cloud_communication->wifi_eg);
         if (bits & ON_WIFI_CONNECT_BIT) {
             ESP_LOGI(TAG, "Wifi connection detected.");
             cloud_communication->validate_hub();
             cloud_communication->get_electricity_price(price_vec);
+            cloud_communication->connect_websocket();
             xEventGroupClearBits(cloud_communication->wifi_eg, ON_WIFI_CONNECT_BIT);
         }
+        cloud_communication->parse_websocket_data();
 
         bool success = xQueueReceive(cloud_communication->cloud_control_q, &action, portMAX_DELAY) == pdTRUE;
-        if (success && action == 1 && sending) {
+        if (success && action == 1) {
             cloud_communication->send_data();
         }
-        else if (success && action == 1) {
-            cloud_communication->read_data();
-        }
+        // else if (success && action == 1) {
+        //     // cloud_communication->read_data();
+        //     cloud_communication->parse_websocket_data();
+        // }
         else if (success && action == 0) {
             cloud_communication->get_electricity_price(price_vec);
         }
@@ -324,40 +334,74 @@ void CloudCommunication::send_data()
     }
 }
 
-void CloudCommunication::read_data()
-{
-    if (tb_headers.empty() || tb_url.empty() || read_http_body.empty()) {
-        ESP_LOGI(TAG, "Crucial parameters not found.");
-        return;
-    }
+// void CloudCommunication::read_data()
+// {
+//     if (tb_headers.empty() || tb_url.empty() || read_http_body.empty()) {
+//         ESP_LOGI(TAG, "Crucial parameters not found.");
+//         return;
+//     }
 
-    ESP_LOGI(TAG, "Fetching tb command...");
+// void CloudCommunication::read_data()
+// {
+//     if (tb_headers.empty() || tb_url.empty() || read_http_body.empty()) {
+//         ESP_LOGI(TAG, "Crucial parameters not found.");
+//         return;
+//     }
 
-    char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
-    if (!buffer) {
-        ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
-        // xSemaphoreGive(cloud_communication->ipstack_mtx);
-        // vTaskSuspend(NULL);
-        return;
-    }
-    bool success = ipstack->http_request(tb_url.c_str(), buffer,
-        read_http_body.c_str(), THINGSPEAK_CERT, HTTP_METHOD_POST, tb_headers);
+//     ESP_LOGI(TAG, "Fetching tb command...");
 
-    controller_data ctrl_data = {};
-    bool parsed = parse_talkback_response_json(buffer, &ctrl_data);
-    free(buffer);
+//     char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+//     if (!buffer) {
+//         ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
+//         // xSemaphoreGive(cloud_communication->ipstack_mtx);
+//         // vTaskSuspend(NULL);
+//         return;
+//     }
+//     bool success = ipstack->http_request(tb_url.c_str(), buffer,
+//         read_http_body.c_str(), THINGSPEAK_CERT, HTTP_METHOD_POST, tb_headers);
 
-    if (success && parsed && xQueueSendToBack(controller_q, &ctrl_data, 0) == pdTRUE) {
-        ESP_LOGI(TAG, "Added command to queue\nCommand: %d\nDevice id: %" PRIu64,
-                static_cast<int>(ctrl_data.data.command), ctrl_data.device_id);
-    } else if (success && parsed) {
-        ESP_LOGE(TAG, "Error adding command to queue");
-    } else if (success) {
-        ESP_LOGI(TAG, "Error parsing command or no command in queue.");
-    } else {
-        ESP_LOGE(TAG, "HTTP error.");
-    }
-}
+//     controller_data ctrl_data = {};
+//     bool parsed = parse_talkback_response_json(buffer, &ctrl_data);
+//     free(buffer);
+
+//     if (success && parsed && xQueueSendToBack(controller_q, &ctrl_data, 0) == pdTRUE) {
+//         ESP_LOGI(TAG, "Added command to queue\nCommand: %d\nDevice id: %" PRIu64,
+//                 static_cast<int>(ctrl_data.data.command), ctrl_data.device_id);
+//     } else if (success && parsed) {
+//         ESP_LOGE(TAG, "Error adding command to queue");
+//     } else if (success) {
+//         ESP_LOGI(TAG, "Error parsing command or no command in queue.");
+//     } else {
+//         ESP_LOGE(TAG, "HTTP error.");
+//     }
+// }
+//     ESP_LOGI(TAG, "Fetching tb command...");
+
+//     char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+//     if (!buffer) {
+//         ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
+//         // xSemaphoreGive(cloud_communication->ipstack_mtx);
+//         // vTaskSuspend(NULL);
+//         return;
+//     }
+//     bool success = ipstack->http_request(tb_url.c_str(), buffer,
+//         read_http_body.c_str(), THINGSPEAK_CERT, HTTP_METHOD_POST, tb_headers);
+
+//     controller_data ctrl_data = {};
+//     bool parsed = parse_talkback_response_json(buffer, &ctrl_data);
+//     free(buffer);
+
+//     if (success && parsed && xQueueSendToBack(controller_q, &ctrl_data, 0) == pdTRUE) {
+//         ESP_LOGI(TAG, "Added command to queue\nCommand: %d\nDevice id: %" PRIu64,
+//                 static_cast<int>(ctrl_data.data.command), ctrl_data.device_id);
+//     } else if (success && parsed) {
+//         ESP_LOGE(TAG, "Error adding command to queue");
+//     } else if (success) {
+//         ESP_LOGI(TAG, "Error parsing command or no command in queue.");
+//     } else {
+//         ESP_LOGE(TAG, "HTTP error.");
+//     }
+// }
 
 void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
 {
@@ -402,4 +446,66 @@ void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
             price_vec.pop_back();
         }
     }
+}
+
+void CloudCommunication::connect_websocket()
+{
+    if (ws_url.empty()) {
+        ESP_LOGE(TAG, "Websocket url not found.");
+        return;
+    }
+
+    esp_err_t err = ipstack->init_websocket(ws_url.c_str());
+    if (err != ERR_OK) {
+        ESP_LOGE(TAG, "Failed to init websocket client: %s", esp_err_to_name(err));
+        return;
+    }
+    ESP_LOGI(TAG, "Websocket connected to %s", ws_url.c_str());
+    // if (!ipstack->init_websocket(ws_url.c_str())) {
+    //     ESP_LOGE(TAG, )
+    // }
+}
+
+void CloudCommunication::parse_websocket_data()
+{
+    t_websocket_data ws_data = {};
+    if (!ipstack->get_websocket_data(&ws_data, 0)) {
+        ESP_LOGI(TAG, "No websocket data to process.");
+        return;
+    }
+    ESP_LOGI(TAG, "Websocket data: %s", ws_data.payload);
+    std::string payload_str = ws_data.payload;
+    auto parsed_cmd = split<std::string>(payload_str, '|');
+    if (parsed_cmd.size() < 2) {
+        ESP_LOGI(TAG, "No websocket data to process.");
+        return;
+    }
+
+    controller_data ctrl_data = { .type = DATA_TYPE_COMMAND };
+    auto command = convertEnum<commands>(parsed_cmd[0]);
+    if (command.has_value()) {
+        ctrl_data.data.command = command.value();
+    } else {
+        ESP_LOGI(TAG, "Invalid command: %s", parsed_cmd[0].c_str());
+        return;
+    }
+
+    auto device_id_str = parsed_cmd[1];
+    uint64_t device_id = 0;
+    auto [ptr, ec] = std::from_chars(device_id_str.data(),
+        device_id_str.data() + device_id_str.size(), device_id);
+
+    if (ec == std::errc{}) {
+        ctrl_data.device_id = device_id;
+    } else {
+        ESP_LOGI(TAG, "Invalid device_id: %s", device_id_str.c_str());
+        return;
+    }
+
+    if (xQueueSendToBack(controller_q, &ctrl_data, 0) != pdTRUE) {
+        ESP_LOGI(TAG, "Failed to send data to controller queue");
+        return;
+    }
+    ESP_LOGI(TAG, "Websocket data processed succesfully :)");
+
 }

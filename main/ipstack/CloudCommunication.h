@@ -76,26 +76,28 @@ private:
     // int jwt_error = -1;
 
     std::map<std::string, std::string> auth_headers = {};
-    const std::map<std::string, std::string> tb_headers = {
-        { "Host", "api.thingspeak.com" },
-        { "Content-Type", "application/x-www-form-urlencoded" },
-        { "Accept", "*/*" }
-    };
+    // const std::map<std::string, std::string> tb_headers = {
+    //     { "Host", "api.thingspeak.com" },
+    //     { "Content-Type", "application/x-www-form-urlencoded" },
+    //     { "Accept", "*/*" }
+    // };
 
-    std::string tb_url;
-    std::string read_http_body;
+    // std::string tb_url;
+    // std::string read_http_body;
 
-
+    std::string ws_url;
 
     // bool generate_hub_jwt(char *buffer, size_t size);
 
     static void elec_price_req_timer_cb(TimerHandle_t xTimer);
-    static void cloud_comm_timer_cb(TimerHandle_t xTimer);
+    static void send_data_timer_cb(TimerHandle_t xTimer);
 
     void validate_hub();
-    void read_data();
+    // void read_data();
     void send_data();
     void get_electricity_price(std::vector<float> &price_vec);
+    void connect_websocket();
+    void parse_websocket_data();
     
     static void cloud_task(void *param);
 
