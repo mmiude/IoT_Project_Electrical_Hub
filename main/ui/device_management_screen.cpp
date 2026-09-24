@@ -8,6 +8,7 @@
 #include "esp_log.h"
 
 // the zigbee join window stays open for 3 minutes after add device has been pressed -> shows listening 
+// delete needs to be tapped twice to prevent accidental deletion! 
 
 static constexpr uint32_t JOIN_WINDOW_MS = 180000;
 
@@ -16,6 +17,7 @@ namespace {
 class DeviceManagementScreen : public UiModelListener {
 public:
     lv_obj_t *build(UiModel &model);
+    void open_edit_popup(uint64_t id);
 
 private:
     struct DeviceRow {
@@ -35,10 +37,10 @@ private:
     void refresh_connected_count();
     void update_empty_state();
 
-    void open_edit_popup(uint64_t id);
     void close_edit_popup();
     void save_edit_popup();
     void select_priority(int priority);
+    void set_delete_confirm_mode(bool confirming);
 
     static void back_btn_cb(lv_event_t *e);
     static void add_device_btn_cb(lv_event_t *e);
@@ -48,6 +50,8 @@ private:
     static void cancel_btn_cb(lv_event_t *e);
     static void priority_btn_cb(lv_event_t *e);
     static void delete_btn_cb(lv_event_t *e);
+    static void keep_device_btn_cb(lv_event_t *e);
+    static void confirm_delete_btn_cb(lv_event_t *e);
 
     UiModel *model{};
     lv_obj_t *subtitle_label{};
@@ -57,12 +61,17 @@ private:
 
     std::map<uint64_t, DeviceRow> rows;
 
-    // edit popup
+    // edit popup - only one open at a time
     lv_obj_t *popup_overlay{};
     lv_obj_t *popup_name_ta{};
     lv_obj_t *popup_priority_btns[3]{};
     int popup_priority{0};
     uint64_t popup_device_id{0};
+
+    lv_obj_t *popup_cancel_btn{};
+    lv_obj_t *popup_save_btn{};
+    lv_obj_t *popup_keep_btn{};
+    lv_obj_t *popup_confirm_delete_btn{};
 };
 
 DeviceManagementScreen *g_screen = nullptr;
@@ -113,8 +122,20 @@ void DeviceManagementScreen::priority_btn_cb(lv_event_t *e)
 
 void DeviceManagementScreen::delete_btn_cb(lv_event_t *)
 {
-    ESP_LOGW("DEV_MGMT", "delete tapped - not implemented yet");
-    // PLACEHOLDER!! idk how to make it work yet
+    if (g_screen) g_screen->set_delete_confirm_mode(true);
+}
+
+void DeviceManagementScreen::keep_device_btn_cb(lv_event_t *)
+{
+    if (g_screen) g_screen->set_delete_confirm_mode(false);
+}
+
+// hub side only, Zigbee still lingers
+void DeviceManagementScreen::confirm_delete_btn_cb(lv_event_t *)
+{
+    if (!g_screen) return;
+    g_screen->model->remove_device(g_screen->popup_device_id);
+    g_screen->close_edit_popup();
 }
 
 void DeviceManagementScreen::build_row(uint64_t id, const UiDevice &dev)
@@ -223,7 +244,19 @@ void DeviceManagementScreen::select_priority(int priority)
     }
 }
 
-// very thight squeeze
+void DeviceManagementScreen::set_delete_confirm_mode(bool confirming)
+{
+    auto show = [](lv_obj_t *obj, bool visible) {
+        if (!obj) return;
+        if (visible) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    };
+    show(popup_cancel_btn, !confirming);
+    show(popup_save_btn, !confirming);
+    show(popup_keep_btn, confirming);
+    show(popup_confirm_delete_btn, confirming);
+}
+
 void DeviceManagementScreen::open_edit_popup(uint64_t id)
 {
     const UiDevice *dev = model->find(id);
@@ -273,7 +306,7 @@ void DeviceManagementScreen::open_edit_popup(uint64_t id)
     lv_textarea_set_placeholder_text(popup_name_ta, "Device name");
     lv_textarea_set_text(popup_name_ta, dev->name.c_str());
 
-    // PLACEHOLDER (see delete_btn_cb) - inert for now, just reserves the spot + styling.
+    // tap swaps the button row below into keep/confirm - see set_delete_confirm_mode.
     lv_obj_t *delete_btn = create_icon_button(name_row, LV_SYMBOL_TRASH, 0x7A1F1F);
     lv_obj_add_event_cb(delete_btn, delete_btn_cb, LV_EVENT_CLICKED, NULL);
 
@@ -308,21 +341,40 @@ void DeviceManagementScreen::open_edit_popup(uint64_t id)
     lv_obj_set_flex_flow(btn_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(btn_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    lv_obj_t *cancel_btn = lv_button_create(btn_row);
-    lv_obj_set_size(cancel_btn, 200, 40);
-    lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0x333333), 0);
-    lv_obj_t *cancel_lbl = lv_label_create(cancel_btn);
+    popup_cancel_btn = lv_button_create(btn_row);
+    lv_obj_set_size(popup_cancel_btn, 200, 40);
+    lv_obj_set_style_bg_color(popup_cancel_btn, lv_color_hex(0x333333), 0);
+    lv_obj_t *cancel_lbl = lv_label_create(popup_cancel_btn);
     lv_label_set_text(cancel_lbl, "Cancel");
     lv_obj_center(cancel_lbl);
-    lv_obj_add_event_cb(cancel_btn, cancel_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(popup_cancel_btn, cancel_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *save_btn = lv_button_create(btn_row);
-    lv_obj_set_size(save_btn, 200, 40);
-    lv_obj_set_style_bg_color(save_btn, lv_color_hex(0x4CAF50), 0);
-    lv_obj_t *save_lbl = lv_label_create(save_btn);
+    popup_save_btn = lv_button_create(btn_row);
+    lv_obj_set_size(popup_save_btn, 200, 40);
+    lv_obj_set_style_bg_color(popup_save_btn, lv_color_hex(0x4CAF50), 0);
+    lv_obj_t *save_lbl = lv_label_create(popup_save_btn);
     lv_label_set_text(save_lbl, "Save");
     lv_obj_center(save_lbl);
-    lv_obj_add_event_cb(save_btn, save_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(popup_save_btn, save_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    // confirm set: hidden until the trash icon is tapped once (see set_delete_confirm_mode)
+    popup_keep_btn = lv_button_create(btn_row);
+    lv_obj_set_size(popup_keep_btn, 200, 40);
+    lv_obj_set_style_bg_color(popup_keep_btn, lv_color_hex(0x333333), 0);
+    lv_obj_t *keep_lbl = lv_label_create(popup_keep_btn);
+    lv_label_set_text(keep_lbl, "Keep device");
+    lv_obj_center(keep_lbl);
+    lv_obj_add_event_cb(popup_keep_btn, keep_device_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    popup_confirm_delete_btn = lv_button_create(btn_row);
+    lv_obj_set_size(popup_confirm_delete_btn, 200, 40);
+    lv_obj_set_style_bg_color(popup_confirm_delete_btn, lv_color_hex(0xE53935), 0);
+    lv_obj_t *confirm_lbl = lv_label_create(popup_confirm_delete_btn);
+    lv_label_set_text(confirm_lbl, "Confirm delete");
+    lv_obj_center(confirm_lbl);
+    lv_obj_add_event_cb(popup_confirm_delete_btn, confirm_delete_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    set_delete_confirm_mode(false);
 
     // keyboard is visible while the popup is open
     lv_obj_t *keyboard = lv_keyboard_create(popup_overlay);
@@ -349,6 +401,10 @@ void DeviceManagementScreen::close_edit_popup()
     }
     popup_name_ta = nullptr;
     for (auto &btn : popup_priority_btns) btn = nullptr;
+    popup_cancel_btn = nullptr;
+    popup_save_btn = nullptr;
+    popup_keep_btn = nullptr;
+    popup_confirm_delete_btn = nullptr;
 }
 
 lv_obj_t *DeviceManagementScreen::build(UiModel &m)
@@ -400,4 +456,9 @@ lv_obj_t *create_device_management_screen(UiModel &model)
 {
     static DeviceManagementScreen screen;
     return screen.build(model);
+}
+
+void device_management_open_edit_popup(uint64_t id)
+{
+    if (g_screen) g_screen->open_edit_popup(id);
 }
