@@ -18,6 +18,8 @@ IPStack::IPStack(EventGroupHandle_t event_group)
 
     instance_any_id = nullptr;
     instance_got_ip = nullptr;
+
+    ws_q = xQueueCreate(10, sizeof(t_websocket_data));
 }
 
 bool IPStack::wait_for_wifi()
@@ -138,7 +140,7 @@ void IPStack::wifi_event_handler(void* arg, esp_event_base_t event_base,
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
-        xEventGroupSetBits(ipstack->eg, WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(ipstack->eg, WIFI_CONNECTED_BIT | ON_WIFI_CONNECT_BIT);
     }
 }
 
@@ -244,20 +246,52 @@ esp_err_t IPStack::http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
+void IPStack::websocket_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    auto ipstack = static_cast<IPStack *>(arg);
+    auto data = static_cast<esp_websocket_event_data_t *>(event_data);
+
+    switch (event_id)
+    {
+        case WEBSOCKET_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "WEBSOCKET_EVENT_CONNECTED");
+            break;
+
+        case WEBSOCKET_EVENT_DISCONNECTED:
+            ESP_LOGW(TAG, "WEBSOCKET_EVENT_DISCONNECTED");
+            break;
+
+        case WEBSOCKET_EVENT_DATA:
+            if (data->data_ptr != nullptr && data->data_len > 0) {
+                t_websocket_data ws_data = {};
+                ws_data.op_code = data->op_code;
+
+                // Copy up to buffer capacity and null-terminate
+                size_t copy_len = std::min((size_t)data->data_len, sizeof(ws_data.payload) - 1);
+                memcpy(ws_data.payload, data->data_ptr, copy_len);
+                ws_data.payload[copy_len] = '\0';
+
+                if (xQueueSendToBack(ipstack->ws_q, &ws_data, 0) == pdTRUE) {
+                    ESP_LOGI(TAG, "Websocket data passed successfully");
+                }
+            }
+            break;
+
+        case WEBSOCKET_EVENT_ERROR:
+            ESP_LOGE(TAG, "WEBSOCKET_EVENT_ERROR");
+            break;
+        
+        default:
+            break;
+    }
+}
+
 bool IPStack::call_http_request(t_http_request req)
 {
     bool success = false;
 
-    switch (req.method)
-    {
-    case HTTP_METHOD_GET:
-        break;
-    case HTTP_METHOD_POST:
-        // esp_http_client_set_header(client, "Content-Type", "application/json");
+    if (req.method == HTTP_METHOD_POST) {
         esp_http_client_set_post_field(*req.client, req.body_data, strlen(req.body_data));
-        break;
-    default:
-        break;
     }
 
     esp_err_t err = esp_http_client_perform(*req.client);
@@ -337,4 +371,37 @@ bool IPStack::http_request(const char *url, char *response_buff, const char *bod
         .response_buff = response_buff
     };
     return call_http_request(req);
+}
+
+esp_err_t IPStack::init_websocket(const char *uri)
+{
+    esp_websocket_client_config_t ws_cfg = {};
+    ws_cfg.uri = uri;
+
+    ws_client = esp_websocket_client_init(&ws_cfg);
+    if (ws_client == nullptr) {
+        // ESP_LOGE(TAG, "Failed to initialize WebSocket client");
+        return ERR_ARG;
+    }
+
+    esp_websocket_register_events(
+        ws_client, 
+        WEBSOCKET_EVENT_ANY, 
+        websocket_event_handler, 
+        this
+    );
+
+    esp_err_t err = esp_websocket_client_start(ws_client);
+    return err;
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(err));
+    //     return false;
+    // }
+
+    // return true;
+}
+
+bool IPStack::get_websocket_data(t_websocket_data *ws_data, int timeout_ms)
+{
+    return xQueueReceive(ws_q, ws_data, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }

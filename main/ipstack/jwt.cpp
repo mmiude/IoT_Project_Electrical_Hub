@@ -25,7 +25,7 @@ int base64url_encode(const unsigned char *src, size_t src_len, char *dst, size_t
     return 0;
 }
 
-int generate_jwt(char *output_buf, size_t output_max_len, const char *secret, const char *device_id/*, uint32_t expiry*/) {
+int generate_jwt(char *output_buf, size_t output_max_len, const char *secret, const char *hub_id/*, uint32_t expiry*/) {
     char header_b64[64] = {0};
     char payload_b64[256] = {0};
     char raw_payload[128] = {0};
@@ -37,7 +37,7 @@ int generate_jwt(char *output_buf, size_t output_max_len, const char *secret, co
     }
 
     // 2. Format Payload (No dynamic JSON library needed for simple structures)
-    snprintf(raw_payload, sizeof(raw_payload), "{\"device\":\"%s\"}", device_id);
+    snprintf(raw_payload, sizeof(raw_payload), "{\"hub\":\"%s\"}", hub_id);
     if (base64url_encode((const unsigned char*)raw_payload, strlen(raw_payload), payload_b64, sizeof(payload_b64)) != 0) {
         return -2;
     }
