@@ -24,18 +24,18 @@ async function googleOauthHandler(req, res) {
     const userName = `${given_name} ${family_name}`
     
     const pg = new Postgres()
-    const userId = await pg.find_or_create_user(userName, email, picture)
+    const pgUserData = await pg.find_or_create_user(userName, email, picture)
     await pg.sql.end()
-    if (userId == null) {
+    if (pgUserData == null) {
         return res.send("Error")
     }
-    console.log(userId)
+    // console.log(userId)
 
-    session.userId = userId
-    session.name = userName
-    session.email = email
+    session.userId = pgUserData.id
+    session.name = pgUserData.name
+    session.email = pgUserData.email
 
-    const userData = { userId, userName, email }
+    const userData = { userId: pgUserData.id, userName: pgUserData.name, email: pgUserData.email }
     const refreshToken = signJwt(
         { userData, session: session.id },
         config.jwtSecret,

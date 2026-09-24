@@ -56,47 +56,182 @@
         <!-- <div class="w-full p-2 rounded-md border-solid border-black border-1 flex shadow-sm">
             <%= data.user %>
         </div> -->
-    <div class="flex min-h-screen min-h-dvh p-1 w-full gap-1">
+    
+    <div class="flex max-h-screen max-h-dvh min-h-screen min-h-dvh p-1 w-full gap-1">
+        <!-- CHART -->
         <div class="p-2 flex-1 gap-1 flex flex-col rounded-md border-solid border-black border-1 shadow-sm" id="consumption_chart_card">
-            <div class="w-full flex justify-between">
+            <div class="w-full flex justify-between border-b border-slate-500 px-2 pb-1">
                 <p>Consumption chart</p>
                 <button class="hover:cursor-pointer hover:scale-105" onclick="consumptionChartCardFullScreen = ToggleCardSize(0)">
                     <img src="/static/icons/full_screen.png" alt="full_screen" id="consumption_chart_card_toggle_icon">
                 </button>
             </div>
 
-            <div class="w-full max-w-[600px]">
+            <div class="relative h-96 w-full max-w-[600px] mx-auto">
                 <canvas id="consumption_chart"></canvas>
             </div>
+
+            <div class="w-full flex flex-col pt-5 gap-1">
+                <div class="flex flex-col mb-2">
+                    <div class="inline-flex items-center border border-black rounded-md bg-white">
+                        <button name="show_chart_data" id="chart_data_day" class="py-1 flex-1 hover:opacity-80 transition-opacity cursor-pointer">
+                            Day
+                        </button>
+                        <div class="h-6 w-[1px] bg-[#dcdbe8]"></div>
+
+                        <button name="show_chart_data" id="chart_data_week" class="py-1 flex-1 hover:opacity-80 transition-opacity cursor-pointer">
+                            Week
+                        </button>
+                        <div class="h-6 w-[1px] bg-[#dcdbe8]"></div>
+
+                        <button name="show_chart_data" id="chart_data_month" class="py-1 flex-1 hover:opacity-80 transition-opacity cursor-pointer">
+                            Month
+                        </button>
+                        <div class="h-6 w-[1px] bg-[#dcdbe8]"></div>
+
+                        <button name="show_chart_data" id="chart_data_year" class="py-1 flex-1 hover:opacity-80 transition-opacity cursor-pointer">
+                            Year
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between">
+                    <span>Show on chart:</span>
+                    <div class="inline-flex items-center gap-2">
+                        <label for="switch-component-on" class="text-slate-600 text-sm cursor-pointer">kWh</label>
+                        
+                        <div class="relative inline-block w-11 h-5">
+                            <input id="switch-component-on" type="checkbox" class="peer appearance-none w-11 h-5 bg-[#12005e] rounded-full cursor-pointer transition-colors duration-300" />
+                            <label for="switch-component-on" class="absolute top-0 left-0 w-5 h-5 bg-white rounded-full border border-slate-300 shadow-sm transition-transform duration-300 peer-checked:translate-x-6 peer-checked:border-slate-800 cursor-pointer">
+                            </label>
+                        </div>
+                        
+                        <label for="switch-component-on" class="text-slate-600 text-sm cursor-pointer">Eur</label>
+                    </div>
+                </div>
+                <div class="flex justify-between pr-7">
+                    <span>Group by device:</span>
+                    <div class="flex flex-col justify-center">
+
+                        <div class="relative inline-block w-11 h-5">
+                            <input 
+                                id="group_by_device" 
+                                type="checkbox" 
+                                name="group_by_device"
+                                class="peer appearance-none w-11 h-5 bg-slate-100 rounded-full checked:bg-[#12005e] cursor-pointer transition-colors duration-300" 
+                            />
+                            <label for="group_by_device" class="absolute top-0 left-0 w-5 h-5 bg-white rounded-full border border-slate-300 shadow-sm transition-transform duration-300 peer-checked:translate-x-6 peer-checked:border-slate-800 cursor-pointer">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
-        <div class="p-2 flex-1 flex flex-col rounded-md border-solid border-black border-1 shadow-sm" id="devices_card">
-            <div class="w-full flex justify-between">
+
+        <!-- DEVICES -->
+        <div class="p-2 flex-1 gap-1 flex flex-col rounded-md border-solid border-black border-1 shadow-sm" id="devices_card">
+            <div class="w-full flex justify-between border-b border-slate-500 px-2 pb-1">
                 <p>Devices</p>
                 <button class="hover:cursor-pointer hover:scale-105" onclick="deviceCardFullScreen = ToggleCardSize(1)">
                     <img src="/static/icons/full_screen.png" alt="full_screen" id="devices_card_toggle_icon">
                 </button>
             </div>
+
+            <div id="devices_container" class="flex flex-col gap-1 overflow-auto">
+                <% data.devices.forEach((device) => { %>
+                    <div class="hover:bg-slate-200 rounded-md border-solid border-black border-1 w-full flex justify-between p-2">
+                        <div class="flex flex-col">
+                            <span 
+                                id="device_name|<%= device.id %>"
+                                contenteditable="true" 
+                                class="outline-none hover:bg-gray-100 focus:bg-gray-100 focus:ring-2 focus:ring-blue-500 rounded px-1 py-0.5 transition"
+                            >
+                                <%= device.name %>
+                            </span>
+                            <select name="device_priority" id="device_priority|<%= device.id %>" class="text-sm w-fit border-none rounded cursor-pointer">
+                                <option value="HIGH" <%= device.priority === 'HIGH' ? 'selected' : '' %>>HIGH</option>
+                                <option value="MED" <%= device.priority === 'MED' ? 'selected' : '' %>>MED</option>
+                                <option value="LOW" <%= device.priority === 'LOW' ? 'selected' : '' %>>LOW</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col justify-center">
+                            <div class="relative inline-block w-11 h-5">
+                                <input 
+                                    <%= device.is_on ? 'checked' : '' %> 
+                                    id="device_on|<%= device.id %>" 
+                                    type="checkbox" 
+                                    name="device_on"
+                                    class="peer appearance-none w-11 h-5 bg-slate-100 rounded-full checked:bg-green-400 cursor-pointer transition-colors duration-300" 
+                                />
+                                <label id="label_device_on|<%= device.id %>" for="device_on|<%= device.id %>" class="absolute top-0 left-0 w-5 h-5 bg-white rounded-full border border-slate-300 shadow-sm transition-transform duration-300 peer-checked:translate-x-6 peer-checked:border-slate-800 cursor-pointer">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
         </div>
-        <div class="p-2 flex-1 flex flex-col rounded-md border-solid border-black border-1 shadow-sm" id="settings_card">
-            <div class="w-full flex justify-between">
+
+        <!-- SETTINGS -->
+        <div class="p-2 flex-1 flex gap-1 flex-col rounded-md border-solid border-black border-1 shadow-sm" id="settings_card">
+            <div class="w-full flex justify-between border-b border-slate-500 px-2 pb-1">
                 <p>Settings</p>
                 <button class="hover:cursor-pointer hover:scale-105" onclick="settingsCardFullScreen = ToggleCardSize(2)">
                     <img src="/static/icons/full_screen.png" alt="full_screen" id="settings_card_toggle_icon">
                 </button>
             </div>
+
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between p-2 rounded-md border-1 border-solid border-black items-center">
+                    <h1>Logged in as: </h1>
+                    <div class="flex gap-2 items-center">
+                        <img src="<%= data.profile_picture %>" alt="profile_picture" class=" border-solid border-black border-1 rounded-full w-[40px]">
+                        <span class="text-lg"><%= data.name %></span>
+                    </div>
+                </div>
+                <div class="flex justify-between p-2 rounded-md border-1 border-solid border-black items-center">
+                    <h1>Registered hub: <br><span class="text-sm"><%= data.user_hub != null ? data.user_hub : "No hub registered" %></span></h1>
+                    <button class="cursor-pointer h-full px-4 rounded-md bg-[#12005e] text-white active:scale-95"
+                        <% if (data.user_hub != null) { %>
+                            onclick='DeleteHub(<%- JSON.stringify(data.user_hub) %>)'
+                        <% } else { %>
+                            onclick="alert('register hub')"
+                        <% } %>    
+                    >
+                        <%= data.user_hub != null ? "Delete hub" : "Register new hub" %>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script type="text/javascript">
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        const datasets = [
-            {
-                label: "Monthly consumption (kWh)",
-                data: [40.78, 60.22, 73.89, 200.67, 108.21, 84.37, 91.08, 94.38, 102.54, 86.55, 74.03, 98.76],
-                borderWidth: 1
-            }
-        ]
-        LoadChart(months, datasets)
+        // const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        // const datasets = [
+        //     {
+        //         label: "Monthly consumption (kWh)",
+        //         data: [40.78, 60.22, 73.89, 200.67, 108.21, 84.37, 91.08, 94.38, 102.54, 86.55, 74.03, 98.76],
+        //         borderWidth: 1
+        //     }
+        // ]
+        // LoadChart(months, datasets)
+        const user_hub = <%- JSON.stringify(data.user_hub) %>;
+        const access_token = <%- JSON.stringify(data.access_token ) %>;
+        const device_readings = <%- JSON.stringify(data.device_readings) %>;
+        // console.log(<%- JSON.stringify(data.device_readings) %>)
+        const hourly = getHourlyDataForToday(device_readings)
+        const daily_week = getDailyDataForCurrentWeek(device_readings)
+        const daily_month = getDailyDataForCurrentMonth(device_readings)
+        const monthly = getMonthlyDataForCurrentYear(device_readings)
+
+        console.log(hourly)
+        console.log(daily_week)
+        console.log(daily_month)
+        console.log(monthly)
+        DeviceModifyEvents(user_hub, access_token)
+        LoadChartDataBy(device_readings)
+        // renderDevices(<%- JSON.stringify(data.devices) %>)
     </script>
 </body>
 

@@ -37,51 +37,51 @@ async function RegisterHub(req, res) {
         }
     
         const signature = sign(id)
-        await pg.create_hub(id, signature)
+        const created = await pg.create_hub(id, signature)
         await pg.sql.end()
-        res.send("OK")
+        res.status(created ? 200 : 500).send(created ? "OK" : "ERROR")
     } catch (error) {
         res.status(500).send(error)
     }
 }
 
-async function test() {
-    const values = [
-    {
-        name: "test name" 
-    },
-    {
-        priority: "LOW"
-    },
-    {
-        is_on: true
-    },
+// async function test() {
+//     const values = [
+//     {
+//         name: "test name" 
+//     },
+//     {
+//         priority: "LOW"
+//     },
+//     {
+//         is_on: true
+//     },
 
-    {
-        name: "test name",
-        priority: "LOW"
-    },
-    {
-        priority: "LOW",
-        is_on: true
-    },
-    {
-        name: "test name",
-        is_on: true
-    },
-    {
-        name: "test name",
-        priority: "LOW",
-        is_on: true
-    }
-    ]
+//     {
+//         name: "test name",
+//         priority: "LOW"
+//     },
+//     {
+//         priority: "LOW",
+//         is_on: true
+//     },
+//     {
+//         name: "test name",
+//         is_on: true
+//     },
+//     {
+//         name: "test name",
+//         priority: "LOW",
+//         is_on: true
+//     }
+//     ]
 
-    const pg = new Postgres()
-    for (let i = 0; i < values.length; i++) {
-        console.log("test " + i)
-        await pg.update_device(123, values[i])
-    }
-}
+//     const pg = new Postgres()
+//     for (let i = 0; i < values.length; i++) {
+//         console.log("test " + i)
+//         await pg.update_device(123, values[i])
+//     }
+// }
 
 async function SendDeviceData(req, res) {
     const auth = req.get("Authorization")
@@ -102,32 +102,55 @@ async function SendDeviceData(req, res) {
 
         const { device_id, type, value, value_int, flag } = req.body
         let message = "Error"
+        let values = {}
+        console.log(`${device_id} - ${type}`)
+        let success = false;
         switch (type) {
             case "DATA_TYPE_DEVICE_JOIN":
                 // handle device join
-                await pg.create_device(device_id, decodedJwt.hub)
-                message = `Device ${device_id} created.`
+                console.log(decodedJwt)
+                success = await pg.create_device(device_id, decodedJwt.hub)
+                if (success) {
+                    message = `Device ${device_id} created.`
+                }
+                console.log(message)
                 break
             case "DATA_TYPE_DEVICE_LEFT":
                 // handle device left
                 break
             case "DATA_TYPE_SET_ON":
                 // handle set on
-                const values = {
-                    device_id,
-
+                values = {
+                    is_on: true
                 }
+                success = await pg.update_device(device_id, values)
+                if (success) {
+                    message = `Device ${device_id} set on`
+                }
+                console.log(message)
                 break
             case "DATA_TYPE_PRIORITY":
                 // handle priority
+                values = {
+                    priority: value_int == 1 ? "HIGH" : "LOW"
+                }
+                success = await pg.update_device(device_id, values)
+                if (success) {
+                    message = `Device ${device_id} priority updated to ${values.priority}`
+                }
+                console.log(message)
                 break
             case "DATA_TYPE_ONLINE_STATE":
                 // handle online state
                 break
             default:
                 // handle electricity readings
-                await pg.put_device_reading(device_id, type, value)
-                message = `Inserted ${type}. Value: ${value}`
+                console.log(`${type} ${value}`)
+                success = await pg.put_device_reading(device_id, type, value)
+                if (success) {
+                    message = `Inserted ${type}. Value: ${value}`
+                }
+                console.log(message)
                 break
         }
         await pg.sql.end()
@@ -138,4 +161,4 @@ async function SendDeviceData(req, res) {
     }
 }
 
-module.exports = { LogHubToDB, RegisterHub, test }
+module.exports = { LogHubToDB, RegisterHub, SendDeviceData }
