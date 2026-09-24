@@ -57,7 +57,7 @@ private:
     void command_handler(controller_data &data);
     void periodic_device_check();
 
-    // ui shit
+    // ui stuff
     void send_ui_sync();
     bool push_to_ui(controller_data &data);
 
@@ -65,6 +65,7 @@ private:
 
     void modify_dev_priority(uint64_t dev_id, int priority);
     void modify_dev_automation(uint64_t dev_id, bool state);
+    void remove_device(uint64_t dev_id);
 
 };
 

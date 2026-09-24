@@ -20,7 +20,10 @@ typedef enum {
     TOGGLE_PLUG,
     PLUG_ON,
     PLUG_OFF,
-    OPEN_NETWORK
+    OPEN_NETWORK,
+    // hub-side forget only (map + nvs), echoes DATA_TYPE_DEVICE_LEFT to the ui. does NOT ask the
+    // zigbee radio to unpair the device - see HubController::remove_device.
+    REMOVE_DEVICE
 } commands;
 
 typedef struct device_info {
@@ -63,7 +66,7 @@ typedef enum {
     DATA_TYPE_NETOWRK_ALIVE,
     DATA_TYPE_WIFI_ONLINE
 ,
-    // ui <-> controller state sync. ui asks once after it has started, controller replays its state to the ui
+    // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
     // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
     DATA_TYPE_UI_SYNC_REQUEST,
     DATA_TYPE_UI_SYNC_DONE

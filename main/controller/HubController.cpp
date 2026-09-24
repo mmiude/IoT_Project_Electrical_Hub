@@ -283,6 +283,9 @@ void HubController::command_handler(controller_data &data){
         case OPEN_NETWORK:
             plugProtocols.at(ZIGBEE)->open_network();
             break;
+        case REMOVE_DEVICE:
+            remove_device(data.device_id);
+            break;
         default:
             ESP_LOGE(TAG, "Unknown command request");
             break;
@@ -344,6 +347,21 @@ void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
         it->second.automation_on = state;
         device_info_storage->save_device(it->first, it->second);
     } else ESP_LOGE(TAG, "dev not found! no automation flag modified.");
+}
+
+// hub side only, Zigbee still lingers 
+void HubController::remove_device(uint64_t dev_id) {
+    auto it = devices.find(dev_id);
+    if (it == devices.end()) {
+        ESP_LOGE(TAG, "remove_device: dev not found, nothing removed.");
+        return;
+    }
+    devices.erase(it);
+    device_info_storage->delete_device_from_memory(dev_id);
+    ESP_LOGI(TAG, "device 0x%016llx removed from hub (still joined to zigbee network).", dev_id);
+
+    controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
+    xQueueSendToBack(ui_queue, &left_msg, 0);
 }
 
 
