@@ -2,9 +2,12 @@
 #define ZIGBEECONTROLLER_H
 
 #include <map>
+#include <memory>
+#include "NvsStorage.h"
 #include "zigbee_gateway.h"
 #include "smartPlugInfo.h"
 #include "IDeviceProtocol.h"
+#include "DeviceInfoStorage.h"
 
 #define DEVICE_SIGN_READY   BIT2 
 
@@ -12,7 +15,7 @@
 //this class inherits controllerInterface class and subject class 
 class ZigbeeCoordinator : public IDeviceProtocol {
 public:
-    ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupHandle_t events);
+    ZigbeeCoordinator(QueueHandle_t controller_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<smartPlugInfo>> dev_storage);
 
     void request_energy_consumption_values(uint64_t device_id) override;
     void request_electrical_values(uint64_t device_id) override;
@@ -33,10 +36,12 @@ private:
     EventGroupHandle_t event_group; 
     TaskHandle_t task_handle;
     TaskHandle_t gateway_task_handle;
+    std::shared_ptr<DeviceInfoStorage<smartPlugInfo>> storage;
 
     std::map<uint64_t, smartPlug> devices;
 
     smartPlug* find_plug(uint64_t ieee_addr);
+    void check_devices_map(); 
     //commands to smart plugs 
     ezb_err_t read_electrical_measurement_multipliers(uint16_t dst_addr, uint8_t dst_ep);
     ezb_err_t read_electrical_measurement_values(uint16_t dst_addr, uint8_t dst_ep);
@@ -47,6 +52,8 @@ private:
     esp_err_t send_on_smart_plug(uint16_t dst_addr, uint8_t dst_ep);
     esp_err_t send_off_smart_plug(uint16_t dst_addr, uint8_t dst_ep);
     esp_err_t send_configure_reporting(uint16_t dst_addr, uint8_t dst_ep);
+
+   
 
 };
 

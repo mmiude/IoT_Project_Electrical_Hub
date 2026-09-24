@@ -10,6 +10,13 @@ enum ProtocolIndex {
 };
 
 typedef enum {
+    Z_NETWORK_OPEN,
+    Z_NETWORK_CLOSE,
+    Z_NETWORK_UP,
+    Z_NETWORK_DOWN
+} z_network_status;
+
+typedef enum {
     TOGGLE_PLUG,
     PLUG_ON,
     PLUG_OFF,
@@ -45,12 +52,17 @@ typedef enum {
     DATA_TYPE_THRESHOLD_MED,
     DATA_TYPE_PRIORITY,
     DATA_TYPE_ELEC_PRICE,
+    DATA_TYPE_AUTOMATION,
     // commands coming from ui side
     DATA_TYPE_COMMAND,
     // internal for controller - periodic info request from plugs
     DATA_TYPE_REQUEST_ELEC_VALUES,
     // for ui to recieve online info
-    DATA_TYPE_ONLINE_STATE
+    DATA_TYPE_ONLINE_STATE,
+    // system health information
+    DATA_TYPE_NETOWRK_ALIVE,
+    DATA_TYPE_WIFI_ONLINE
+
 } data_type_t;
 
 typedef struct controller_queue_info {

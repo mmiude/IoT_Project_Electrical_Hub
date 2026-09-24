@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <ranges>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -12,10 +13,15 @@
 #include "esp_log.h"
 #include "IDeviceProtocol.h"
 #include "HubControllerEnums.h"
+#include "DeviceInfoStorage.h"
+#include "SystemConfigStorage.h"
+#include "Subject.h"
 
-class HubController {
+class HubController : public Subject {
 public:
-    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q); 
+    HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage, std::shared_ptr<SystemConfigStorage> config_storage); 
+
+    void attach(std::shared_ptr<Observer> obs) override; 
 
 private:
     static void dataRequestTimerCallback(TimerHandle_t xTimer); 
@@ -23,6 +29,7 @@ private:
     void run();
 
     std::vector<std::shared_ptr<IDeviceProtocol>> plugProtocols;
+    std::vector<std::shared_ptr<Observer>> observers; 
     EventGroupHandle_t event_group;
     QueueHandle_t controller_queue;
     QueueHandle_t cloud_queue;
@@ -30,19 +37,29 @@ private:
     
     TaskHandle_t handle; 
     TimerHandle_t timer_handle;
+
+    std::shared_ptr<DeviceInfoStorage<deviceInfo>> device_info_storage;
+    std::shared_ptr<SystemConfigStorage> system_config_storage;
     std::map<uint64_t, deviceInfo> devices;
     
     float threshold_low;
     float threshold_medium; 
     float current_electricity_price; 
+
+    void notify(int state) override; 
     
     void handle_zigbee_events(controller_data &data); 
     void check_low_thresholds();
     void check_medium_thresholds();
-    void check_thresholds();
+    //void check_thresholds();
     bool threshold_allows_opening(int priority);
     void command_handler(controller_data &data);
     void periodic_device_check();
+
+    void check_device_map();
+
+    void modify_dev_priority(uint64_t dev_id, int priority);
+    void modify_dev_automation(uint64_t dev_id, bool state);
 
 };
 
