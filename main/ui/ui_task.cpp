@@ -9,7 +9,7 @@ static const char *TAG = "UI_TASK";
 
 UiTask::UiTask(QueueHandle_t controller_queue, QueueHandle_t ui_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage)
     : ui_queue(ui_queue), event_group(events), ui_model(controller_queue, storage) {
-    // stack size needs to be big for lvgl (16384 worked in my tests) and priority is idle + 1 since touch
+    // stack size needs to be BIG for lvgl (16384 worked in my tests) and priority is idle + 1 since touch
     xTaskCreate(UiTask::runner, "UI_TASK", 16384, this, tskIDLE_PRIORITY + 1, &handle);
 }
 
@@ -21,7 +21,7 @@ void UiTask::run() {
     xEventGroupWaitBits(event_group, ZIGBEE_STACK_READY, pdFALSE, pdFALSE, portMAX_DELAY);
     ESP_LOGI(TAG, "UI task started, Zigbee stack ready");
 
-    ui_model.load(); // named devices from nvs, before the screens are built so they can show them
+    ui_model.load(); // named devices from nvs before the screens are built so they can show them
     lvgl_port_init();
     screen_manager_init(ui_model);
 
