@@ -1,3 +1,3 @@
 idf_component_register(SRC_DIRS "." "zigbee" "ipstack" "interfaces" "controller" "storage" "leds" "ui" "display" "watchdog" "lib/jsmn"
                        PRIV_INCLUDE_DIRS "." "zigbee" "ipstack" "interfaces" "controller" "storage" "leds" "ui" "display" "watchdog" "lib/jsmn"
-                       PRIV_REQUIRES vfs nvs_flash spi_flash esp_wifi esp_http_client esp-tls esp_driver_uart esp_driver_gpio esp_driver_spi esp_driver_i2c esp_lcd esp_timer jsmn)
+                       PRIV_REQUIRES vfs nvs_flash spi_flash esp_wifi esp_http_client esp_websocket_client esp-tls esp_driver_uart esp_driver_gpio esp_driver_spi esp_driver_i2c esp_lcd esp_timer jsmn)

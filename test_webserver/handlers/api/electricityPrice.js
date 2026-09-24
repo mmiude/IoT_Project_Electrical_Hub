@@ -10,7 +10,7 @@ async function GetElectricityPrices(req, res) {
     const prices = electricityPrices.prices
         .filter(p => new Date(p.startDate) >= now)
         .map(p => p.price)
-    console.log(prices)
+    // console.log(prices)
     res.status(200).send(prices.join(","))
 }
 

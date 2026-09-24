@@ -17,6 +17,7 @@
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "ws": "^8.21.3"
   }
 }
