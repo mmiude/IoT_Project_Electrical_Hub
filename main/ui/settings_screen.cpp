@@ -9,11 +9,7 @@ namespace {
 
 constexpr uint32_t CARD_BG = 0x262626;
 
-<<<<<<< HEAD
 // sliders work in tenths of a c/kWh (into-300) should be changed maybe?
-=======
-// sliders work in tenths of a c/kWh (int 0-300) we should maybe change the rates?
->>>>>>> a79c0ca (clean up)
 
 constexpr int32_t SLIDER_MIN = 0;
 constexpr int32_t SLIDER_MAX = 300;
@@ -50,20 +46,13 @@ void SettingsScreen::back_btn_cb(lv_event_t *)
     screen_manager_show(ScreenId::HOME);
 }
 
-<<<<<<< HEAD
 // PLACEHOLDER wifi still missing
-=======
-// PLACEHOLDER WiFi still missing 
->>>>>>> a79c0ca (clean up)
 void SettingsScreen::network_row_cb(lv_event_t *)
 {
     ESP_LOGW("SETTINGS", "wifi row tapped - not implemented yet");
 }
 
-<<<<<<< HEAD
 // only send the final value once the user lets go
-=======
->>>>>>> a79c0ca (clean up)
 void SettingsScreen::low_slider_changed_cb(lv_event_t *e)
 {
     if (!g_screen) return;
@@ -164,11 +153,7 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_obj_align(back_btn, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_add_event_cb(back_btn, back_btn_cb, LV_EVENT_CLICKED, NULL);
 
-<<<<<<< HEAD
     // network settings are still missing! PLACEHOLDER FOR NOW
-=======
-    // net work settings are still missing! PLACEHOLDER FOR NOW
->>>>>>> a79c0ca (clean up)
     lv_obj_t *network_label = lv_label_create(scr);
     lv_label_set_text(network_label, "Network");
     lv_obj_set_style_text_color(network_label, lv_color_hex(0x999999), 0);
@@ -204,11 +189,7 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_label_set_text(wifi_text, "Wi-Fi - not configured here yet");
     lv_obj_set_style_text_color(wifi_text, lv_color_hex(0x999999), 0);
 
-<<<<<<< HEAD
     // ---- Price threshold section ---
-=======
-    // ---- Price threshold section -----
->>>>>>> a79c0ca (clean up)
     lv_obj_t *threshold_label = lv_label_create(scr);
     lv_label_set_text(threshold_label, "Price Threshold");
     lv_obj_set_style_text_color(threshold_label, lv_color_hex(0x999999), 0);
