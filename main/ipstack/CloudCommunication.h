@@ -70,6 +70,8 @@ private:
     TimerHandle_t elec_price_req_timer_h;
     TimerHandle_t cloud_comm_timer_h;
 
+    TaskHandle_t cloud_task_handle;
+
     // uint8_t efuse_mac[6];
     char efuse_mac[32] = {0};
     // char hub_jwt[512] = {0};
@@ -109,6 +111,7 @@ private:
 public:
     CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, 
         QueueHandle_t _cloud_q, QueueHandle_t _controller_q);
+    ~CloudCommunication();
 };
 
 #endif

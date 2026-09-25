@@ -2316,6 +2316,13 @@ CONFIG_DEFAULT_PIN_TO_RCP_RX=18
 # end of OpenThread RCP Update
 
 #
+# ESP WebSocket client
+#
+# CONFIG_ESP_WS_CLIENT_ENABLE_DYNAMIC_BUFFER is not set
+# CONFIG_ESP_WS_CLIENT_SEPARATE_TX_LOCK is not set
+# end of ESP WebSocket client
+
+#
 # jsmn
 #
 # CONFIG_JSMN_PARENT_LINKS is not set

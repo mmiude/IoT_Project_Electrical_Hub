@@ -6,6 +6,8 @@
 #include <cerrno>
 #include <charconv>
 #include <string_view>
+#include <memory>
+#include "zigbee_gateway.h"
 
 static const char *TAG = "CloudCommunication";
 
@@ -182,7 +184,14 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wi
         static_cast<void*>(this), send_data_timer_cb);
 
     xTaskCreate(cloud_task, "CLOUD_TASK", 4096, static_cast<void*>(this),
-        tskIDLE_PRIORITY + 1, NULL);
+        tskIDLE_PRIORITY + 1, &cloud_task_handle);
+}
+
+CloudCommunication::~CloudCommunication() {
+    if (cloud_comm_timer_h) xTimerDelete(cloud_comm_timer_h, portMAX_DELAY);
+    if (elec_price_req_timer_h) xTimerDelete(elec_price_req_timer_h, portMAX_DELAY);
+    if (cloud_control_q) vQueueDelete(cloud_control_q);
+    if (cloud_task_handle) vTaskDelete(cloud_task_handle);
 }
 
 void CloudCommunication::elec_price_req_timer_cb(TimerHandle_t xTimer)
@@ -204,6 +213,14 @@ void CloudCommunication::cloud_task(void *param)
 
     auto cloud_communication = static_cast<CloudCommunication*>(param);
     auto ipstack = cloud_communication->ipstack;
+
+    xEventGroupWaitBits(cloud_communication->wifi_eg,
+        ZIGBEE_STACK_READY,
+        pdFALSE,
+        pdFALSE,
+        portMAX_DELAY
+    );
+    ESP_LOGI(TAG, "Zigbee ready starting cloud task");
 
     // if (ipstack)
     // cloud_communication->validate_hub();
@@ -258,7 +275,11 @@ void CloudCommunication::validate_hub()
         //     { "Authorization", std::string("Bearer ") + cloud_communication->hub_jwt }
         // };
         // Allocate on heap instead of stack
-    char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+    // char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+    auto buffer = std::unique_ptr<char, decltype(&std::free)>(
+        static_cast<char*>(calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1)), 
+        std::free
+    );
     if (!buffer) {
         ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
         // xSemaphoreGive(cloud_communication->ipstack_mtx);
@@ -266,12 +287,12 @@ void CloudCommunication::validate_hub()
         return;
     }
 
-    bool success = ipstack->http_request(API_HOSTNAME, API_PORT, buffer,
+    bool success = ipstack->http_request(API_HOSTNAME, API_PORT, buffer.get(),
         "/api/initial_log_to_db", "", "",
         HTTP_METHOD_POST, auth_headers);
 
     // Memory cleanup
-    free(buffer);
+    // free(buffer);
 
     if (success) {
         ESP_LOGI(TAG, "Go to: http://%s:%d/register_hub\nAnd enter code: %s\nTo register hub.",
@@ -314,7 +335,11 @@ void CloudCommunication::send_data()
         auto send_http_body = send_http_body_ss.str();
         // ESP_LOGI(TAG, "%s: %s", pcName, send_http_body.c_str());
 
-        char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+        // char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+        auto buffer = std::unique_ptr<char, decltype(&std::free)>(
+            static_cast<char*>(calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1)), 
+            std::free
+        );
         if (!buffer) {
             ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
             // xSemaphoreGive(cloud_communication->ipstack_mtx);
@@ -324,9 +349,9 @@ void CloudCommunication::send_data()
         auto headers = auth_headers;
         headers.insert({ "Content-Type", "application/x-www-form-urlencoded" });
 
-        bool success = ipstack->http_request(API_HOSTNAME, API_PORT, buffer,
+        bool success = ipstack->http_request(API_HOSTNAME, API_PORT, buffer.get(),
             "/api/send_device_data", "", send_http_body.c_str(), HTTP_METHOD_POST, headers);
-        free(buffer);
+        // free(buffer);
 
         ESP_LOGI(TAG, "Data send %s", success ? "successull" : "failed");
     } else {
@@ -406,7 +431,10 @@ void CloudCommunication::send_data()
 void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
 {
     if (price_vec.empty()) {
-        char *buffer = (char *)calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1);
+        auto buffer = std::unique_ptr<char, decltype(&std::free)>(
+            static_cast<char*>(calloc(1, MAX_HTTP_OUTPUT_BUFFER + 1)), 
+            std::free
+        );
         if (!buffer) {
             ESP_LOGE(TAG, "Failed to allocate HTTP response buffer");
             // xSemaphoreGive(cloud_communication->ipstack_mtx);
@@ -414,10 +442,10 @@ void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
             return;
         }
         bool success = ipstack->http_request(API_HOSTNAME, API_PORT,
-                buffer, "/api/get_electricity_prices");
+                buffer.get(), "/api/get_electricity_prices");
 
         if (success) {
-            std::string prices = buffer;
+            std::string prices = buffer.get();
             // price_vec = parseElectricityPrices(prices);
             price_vec = split<float>(prices, ',');
 
@@ -435,7 +463,7 @@ void CloudCommunication::get_electricity_price(std::vector<float> &price_vec)
             ESP_LOGE(TAG, "Error getting electricity prices");
         }
         // xSemaphoreGive(cloud_communication->ipstack_mtx);
-        free(buffer);
+        // free(buffer);
     } else {
         controller_data ctrl_data = {};
         ctrl_data.type = DATA_TYPE_ELEC_PRICE;

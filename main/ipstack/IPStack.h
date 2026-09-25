@@ -72,6 +72,7 @@ private:
     // bool connected;
 public:
     IPStack(EventGroupHandle_t event_group);
+    ~IPStack();
 
     bool connect_wifi(const char *ssid, const char *pw);
     void disconnect_wifi();
