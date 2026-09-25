@@ -77,6 +77,10 @@ public:
     // NOTE; you need to press reset pin on plugs after removing a device! doesn't remove the known device from zigbee network :(
     void remove_device(uint64_t id);
 
+    // saves new wifi credentials (system_config_storage, via the controller) - only takes effect
+    // on the next boot, nothing reconnects wifi live right now.
+    void set_wifi_credentials(const std::string &ssid, const std::string &password);
+
     const std::map<uint64_t, UiDevice> &devices() const { return device_map; }
     const UiDevice *find(uint64_t id) const;
     bool has_price() const { return price_known; }

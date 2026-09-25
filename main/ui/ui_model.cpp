@@ -173,6 +173,20 @@ void UiModel::remove_device(uint64_t id) {
     send(msg);
 }
 
+void UiModel::set_wifi_credentials(const std::string &ssid, const std::string &password) {
+
+    // just pondering ideas how to handle the wifi credential saving
+    // ui has a working popup now that can be used to save ssid and pass :)
+    (void)ssid;
+    (void)password;
+    // controller_data msg{};
+    // msg.type = DATA_TYPE_WIFI_CREDENTIALS;
+    // memset(&msg.data, 0, sizeof(msg.data)); // {} on the union alone only zeroes its first (float) member, not the full wifi struct - a max-length ssid/password would then read past the array with no null terminator otherwise
+    // strncpy(msg.data.wifi.ssid, ssid.c_str(), sizeof(msg.data.wifi.ssid) - 1);
+    // strncpy(msg.data.wifi.password, password.c_str(), sizeof(msg.data.wifi.password) - 1);
+    // send(msg);
+}
+
 const UiDevice *UiModel::find(uint64_t id) const {
     auto it = device_map.find(id);
     return it == device_map.end() ? nullptr : &it->second;
