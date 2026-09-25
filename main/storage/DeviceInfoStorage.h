@@ -63,9 +63,9 @@ public:
         return ESP_ERR_NVS_NOT_FOUND; // or something else here
     }
 
-    esp_err_t eares_name_space() {
+    esp_err_t erase_name_space() {
         deviceCache.clear();
-        return storage.erase_all(); 
+        return storage.erase_all();
     }
 
 private:

@@ -67,6 +67,8 @@ bool IPStack::connect_wifi(const char *ssid, const char *pw)
     wifi_config_t wifi_config = {};
     strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strncpy((char*)wifi_config.sta.password, pw, sizeof(wifi_config.sta.password));
+
+    wifi_config.sta.channel = 1;
     
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );

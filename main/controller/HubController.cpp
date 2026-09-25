@@ -69,6 +69,7 @@ void HubController::run(){
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
+                price_received = true;
                 check_low_thresholds();
                 check_medium_thresholds();
                 break;
@@ -79,6 +80,9 @@ void HubController::run(){
                 break;
             case DATA_TYPE_COMMAND:
                 command_handler(ctrl_data);
+                break;
+            case DATA_TYPE_UI_SYNC_REQUEST:
+                send_ui_sync();
                 break;
             case DATA_TYPE_NETWORK_OPEN:
                 if (ctrl_data.data.flag) notify(Z_NETWORK_OPEN);
@@ -277,7 +281,10 @@ void HubController::command_handler(controller_data &data){
             plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id);
             break; 
         case OPEN_NETWORK:
-            plugProtocols.at(ZIGBEE)->open_network(); 
+            plugProtocols.at(ZIGBEE)->open_network();
+            break;
+        case REMOVE_DEVICE:
+            remove_device(data.device_id);
             break;
         default:
             ESP_LOGE(TAG, "Unknown command request");
@@ -337,7 +344,66 @@ void HubController::modify_dev_priority(uint64_t dev_id, int priority) {
 void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
     auto it = devices.find(dev_id);
     if (it != devices.end()) {
-        it->second.automation_on = state; 
+        it->second.automation_on = state;
         device_info_storage->save_device(it->first, it->second);
     } else ESP_LOGE(TAG, "dev not found! no automation flag modified.");
+}
+
+// hub side only, Zigbee still lingers 
+void HubController::remove_device(uint64_t dev_id) {
+    auto it = devices.find(dev_id);
+    if (it == devices.end()) {
+        ESP_LOGE(TAG, "remove_device: dev not found, nothing removed.");
+        return;
+    }
+    devices.erase(it);
+    device_info_storage->delete_device_from_memory(dev_id);
+    ESP_LOGI(TAG, "device 0x%016llx removed from hub (still joined to zigbee network).", dev_id);
+
+    controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
+    xQueueSendToBack(ui_queue, &left_msg, 0);
+}
+
+
+// ------ ui 
+
+// short timeout 
+bool HubController::push_to_ui(controller_data &data){
+    return xQueueSendToBack(ui_queue, &data, pdMS_TO_TICKS(50)) == pdPASS;
+}
+
+void HubController::send_ui_sync(){
+    ESP_LOGI(TAG, "ui requested sync, replaying state.");
+    bool ok = true;
+    controller_data msg{};
+
+    msg = {.type = DATA_TYPE_THRESHOLD_LOW, .data = {.value = threshold_low}};
+    ok &= push_to_ui(msg);
+    msg = {.type = DATA_TYPE_THRESHOLD_MED, .data = {.value = threshold_medium}};
+    ok &= push_to_ui(msg);
+    if (price_received) {
+        msg = {.type = DATA_TYPE_ELEC_PRICE, .data = {.value = current_electricity_price}};
+        ok &= push_to_ui(msg);
+    }
+
+    for (auto &[key, dev] : devices) {
+        msg = {.device_id = key, .type = DATA_TYPE_DEVICE_JOIN, .data = {}};
+        ok &= push_to_ui(msg);
+        msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}};
+        ok &= push_to_ui(msg);
+        msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}};
+        ok &= push_to_ui(msg);
+        msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}};
+        ok &= push_to_ui(msg);
+        msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}};
+        ok &= push_to_ui(msg);
+    }
+
+    //  ui removes devices it knows about but are missing from the replay, so only say done if nothing got dropped
+    if (ok) {
+        msg = {.type = DATA_TYPE_UI_SYNC_DONE, .data = {}};
+        push_to_ui(msg);
+    } else {
+        ESP_LOGE(TAG, "ui queue full during sync, some state was dropped.");
+    }
 }

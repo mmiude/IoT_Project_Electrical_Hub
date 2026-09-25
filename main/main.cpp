@@ -29,6 +29,8 @@
 #include "HubController.h"
 #include "HubControllerEnums.h"
 
+#include "ui_task.h"
+
 #include "NvsStorage.h"
 #include "DeviceInfoStorage.h"
 #include "SystemConfigStorage.h"
@@ -135,24 +137,39 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
+    // wifi pondering 
+    // static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
+    // std::string saved_ssid, saved_pwd;
+    // bool have_saved_wifi = sysConfStorage->get_wifi_info(saved_ssid, saved_pwd) == ESP_OK && !saved_ssid.empty();
+
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
     IPStack ipstack(wifi_eg);
+    // if (have_saved_wifi) {
+    //     ESP_LOGI(TAG, "connecting with saved wifi credentials (ssid: %s)", saved_ssid.c_str());
+    //     ipstack.connect_wifi(saved_ssid.c_str(), saved_pwd.c_str());
+    // } else {
+    //     ESP_LOGI(TAG, "no saved wifi credentials, using network_info.h defaults");
+    //    ipstack.connect_wifi(SSID, PW);
+    // }
+
     ipstack.connect_wifi(SSID, PW);
 
     static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
-    static QueueHandle_t uiQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to local ui via this queue.
-    static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side 
+    static QueueHandle_t uiQueue = xQueueCreate(32, sizeof(controller_data)); // Hub controller sends data to local ui via this queue. Deeper than the others since the ui state sync replays every device at once.
+    static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side
 
-    CloudCommunication cloud_communication(&ipstack, wifi_eg, /*tb_command_q, */controllerQueue);
+    CloudCommunication cloud_communication(&ipstack, wifi_eg, cloudQueue, controllerQueue);
 
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
-    static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
+    static auto sysConfStorage = std::make_shared<SystemConfigStorage>(); // still needed for thresholds; wifi saving is disabled above
+    static auto uiStorage = std::make_shared<DeviceInfoStorage<UiDeviceRecord>>("ui_ns", "ui_dev_info");
     static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
 
-    //coordinatorStorage->eares_name_space();
-    //controllerStorage->eares_name_space(); 
+    //coordinatorStorage->erase_name_space();
+    //controllerStorage->erase_name_space();
     //sysConfStorage->erase_all_system_config_info();
+    //uiStorage->erase_name_space();
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
         std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
@@ -163,6 +180,7 @@ extern "C" void app_main(void)
 
     static SystemHealth systemHealthMonitor(wifi_eg, controllerQueue); 
 
+    static UiTask ui(controllerQueue, uiQueue, wifi_eg, uiStorage);
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 

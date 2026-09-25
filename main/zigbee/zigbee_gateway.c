@@ -506,7 +506,7 @@ void esp_zigbee_stack_main_task(void *pvParameters) // coordinator task
 {
     event_group = (EventGroupHandle_t)pvParameters;
 
-    xEventGroupWaitBits(event_group, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
+    //xEventGroupWaitBits(event_group, DEVICE_SIGN_READY, pdFALSE, pdFALSE, portMAX_DELAY);
 
     esp_zigbee_config_t zigbee_config = ESP_ZIGBEE_DEFAULT_CONFIG();
 
