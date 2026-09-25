@@ -74,11 +74,13 @@ public:
     void name_device(uint64_t id, const std::string &name, int priority);
     void set_priority(uint64_t id, int priority);
 
+    // bulk action (this is for the automation ON/OFF switch)
+    void set_automation(uint64_t id, bool on);
+
     // NOTE; you need to press reset pin on plugs after removing a device! doesn't remove the known device from zigbee network :(
     void remove_device(uint64_t id);
 
-    // saves new wifi credentials (system_config_storage, via the controller) - only takes effect
-    // on the next boot, nothing reconnects wifi live right now.
+    // for saving wifi credentials! no actaul function yet
     void set_wifi_credentials(const std::string &ssid, const std::string &password);
 
     const std::map<uint64_t, UiDevice> &devices() const { return device_map; }

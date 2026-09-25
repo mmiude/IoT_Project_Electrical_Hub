@@ -18,6 +18,7 @@ constexpr uint32_t SWITCH_ON_COLOR = 0x4CAF50;
 // home screen implements UiModelListener and is kept as a function
 // local static in create_home_screen() -> it (and every lv_obj_t it owns) lives for as long as
 // the app runs, same as the other screens (screen_manager never destroys a screen, just hides it) this is better imo
+// that will be the main idea...
 
 // threshold chip shows both cutoffs now (settings will have both sliders)
 
@@ -57,6 +58,7 @@ private:
     static void switch_event_cb(lv_event_t *e);
     static void add_btn_cb(lv_event_t *e);
     static void settings_btn_cb(lv_event_t *e);
+    static void automation_switch_cb(lv_event_t *e);
 
     UiModel *model{};
     lv_obj_t *device_list{};
@@ -85,6 +87,17 @@ void HomeScreen::switch_event_cb(lv_event_t *e)
     auto *sw = static_cast<lv_obj_t *>(lv_event_get_target(e));
     bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
     ctx->screen->model->set_plug(ctx->device_id, on);
+}
+
+// bulk action
+void HomeScreen::automation_switch_cb(lv_event_t *e)
+{
+    auto *screen = static_cast<HomeScreen *>(lv_event_get_user_data(e));
+    auto *sw = static_cast<lv_obj_t *>(lv_event_get_target(e));
+    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    for (const auto &entry : screen->model->devices()) {
+        screen->model->set_automation(entry.first, on);
+    }
 }
 
 lv_obj_t *HomeScreen::build_chip(lv_obj_t *parent, int x, int width, const char *label, uint32_t value_color, lv_obj_t **out_value)
@@ -309,6 +322,18 @@ lv_obj_t *HomeScreen::build(UiModel &m)
     lv_label_set_text(section_label, "Devices");
     lv_obj_set_style_text_color(section_label, lv_color_hex(0x999999), 0);
     lv_obj_align(section_label, LV_ALIGN_TOP_LEFT, 14, 74);
+
+    // sets every known device at once
+    lv_obj_t *automation_label = lv_label_create(screen);
+    lv_label_set_text(automation_label, "Automation");
+    lv_obj_set_style_text_color(automation_label, lv_color_hex(0x999999), 0);
+    lv_obj_align(automation_label, LV_ALIGN_TOP_RIGHT, -72, 72);
+
+    lv_obj_t *automation_switch = lv_switch_create(screen);
+    lv_obj_set_style_bg_color(automation_switch, lv_color_hex(SWITCH_ON_COLOR), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_align(automation_switch, LV_ALIGN_TOP_RIGHT, -14, 63);
+    lv_obj_add_state(automation_switch, LV_STATE_CHECKED); // matches devices' own default (automation_on = true on join)
+    lv_obj_add_event_cb(automation_switch, automation_switch_cb, LV_EVENT_VALUE_CHANGED, this);
 
     device_list = lv_obj_create(screen);
     lv_obj_set_size(device_list, 460, 210);

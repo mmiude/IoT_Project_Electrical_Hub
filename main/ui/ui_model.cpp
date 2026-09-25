@@ -168,6 +168,11 @@ void UiModel::set_priority(uint64_t id, int priority) {
     notify_updated(it->second);
 }
 
+void UiModel::set_automation(uint64_t id, bool on) {
+    controller_data msg = {.device_id = id, .type = DATA_TYPE_AUTOMATION, .data = {.flag = on}};
+    send(msg);
+}
+
 void UiModel::remove_device(uint64_t id) {
     controller_data msg = {.device_id = id, .type = DATA_TYPE_COMMAND, .data = {.command = REMOVE_DEVICE}};
     send(msg);
@@ -175,16 +180,9 @@ void UiModel::remove_device(uint64_t id) {
 
 void UiModel::set_wifi_credentials(const std::string &ssid, const std::string &password) {
 
-    // just pondering ideas how to handle the wifi credential saving
-    // ui has a working popup now that can be used to save ssid and pass :)
+    // still needs actual storing !!!
     (void)ssid;
     (void)password;
-    // controller_data msg{};
-    // msg.type = DATA_TYPE_WIFI_CREDENTIALS;
-    // memset(&msg.data, 0, sizeof(msg.data)); // {} on the union alone only zeroes its first (float) member, not the full wifi struct - a max-length ssid/password would then read past the array with no null terminator otherwise
-    // strncpy(msg.data.wifi.ssid, ssid.c_str(), sizeof(msg.data.wifi.ssid) - 1);
-    // strncpy(msg.data.wifi.password, password.c_str(), sizeof(msg.data.wifi.password) - 1);
-    // send(msg);
 }
 
 const UiDevice *UiModel::find(uint64_t id) const {
