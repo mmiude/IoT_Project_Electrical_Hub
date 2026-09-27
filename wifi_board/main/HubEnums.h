@@ -1,5 +1,5 @@
-#ifndef HUBCONTROLLERENUMS_H
-#define HUBCONTROLLERENUMS_H
+#ifndef HUB_ENUMS_H
+#define HUB_ENUMS_H
 
 #include <string>
 
@@ -68,7 +68,9 @@ typedef enum {
     // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
     // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
     DATA_TYPE_UI_SYNC_REQUEST,
-    DATA_TYPE_UI_SYNC_DONE
+    DATA_TYPE_UI_SYNC_DONE,
+
+    DATA_TYPE_WIFI_CREDENTIALS
 } data_type_t;
 
 typedef struct __attribute__((packed)) {
@@ -80,6 +82,11 @@ typedef struct __attribute__((packed)) {
         int value_int;
         bool flag;
         commands command;
+
+        struct __attribute__((packed)) {
+            char ssid[128];
+            char pw[128];
+        } wifi;
     } data;
 
 } controller_data;

@@ -10,7 +10,7 @@
 #include "esp_log.h"
 // #include "esp_crc.h"
 
-#include "HubControllerEnums.h"
+#include "HubEnums.h"
 
 // typedef struct __attribute__((packed)) {
 //     uint16_t header;

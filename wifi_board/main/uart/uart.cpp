@@ -39,7 +39,7 @@ void Uart::uart_task(void *param)
             sizeof(controller_data),
             pdMS_TO_TICKS(1000)
         );
-        if (rx_bytes >= 0) {
+        if (rx_bytes > 0) {
             ESP_LOGI(pcName, "Read %d bytes from uart", rx_bytes);
             if (rx_bytes == sizeof(controller_data)
                 && xQueueSendToBack(instance->rx_queue, &ctrl_data, 0) == pdTRUE
@@ -47,6 +47,6 @@ void Uart::uart_task(void *param)
                 ESP_LOGI(pcName, "Data passed to queue");
             }
         }
-
+        
     }
 }
