@@ -24,7 +24,7 @@
 
 #include "jwt.h"
 #include "CloudCommunication.h"
-#include "HubControllerEnums.h"
+#include "HubEnums.h"
 #include "uart.h"
 
 static const char *TAG = "MAIN"; 
@@ -52,13 +52,13 @@ extern "C" void app_main(void)
 
     // ipstack.connect_wifi(SSID, PW);
 
-    IPStack ipstack(wifi_eg);
-    ipstack.connect_wifi(SSID, PW);
-
+    // ipstack.connect_wifi(SSID, PW);
+    
     static QueueHandle_t rx_queue = xQueueCreate(10, sizeof(controller_data));
     static QueueHandle_t tx_queue = xQueueCreate(10, sizeof(controller_data));
-
+    
     static Uart uart(UART_NUM_1, GPIO_NUM_16, GPIO_NUM_17, rx_queue, tx_queue);
+    IPStack ipstack(wifi_eg, rx_queue);
     // static QueueHandle_t controllerQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller receives all data from this queue. If task sends ANY data to controller it must be put here.
     // static QueueHandle_t uiQueue = xQueueCreate(32, sizeof(controller_data)); // Hub controller sends data to local ui via this queue. Deeper than the others since the ui state sync replays every device at once.
     // static QueueHandle_t cloudQueue = xQueueCreate(10, sizeof(controller_data)); // Hub controller sends data to cloud via this queue - not yet implemented on controller side
@@ -66,6 +66,14 @@ extern "C" void app_main(void)
 
 
     static CloudCommunication cloud_communication(&ipstack, wifi_eg, rx_queue, tx_queue);
+
+    // vTaskDelay(pdMS_TO_TICKS(5000));
+    // controller_data ctrl_data = {};
+    // ctrl_data.type = DATA_TYPE_WIFI_CREDENTIALS;
+    // snprintf(ctrl_data.data.wifi.ssid, sizeof(ctrl_data.data.wifi.ssid), "%s", SSID);
+    // snprintf(ctrl_data.data.wifi.pw, sizeof(ctrl_data.data.wifi.pw), "%s", PW);
+    // // ctrl_data.data.wifi_ssid = SSID;
+    // xQueueSendToBack(rx_queue, &ctrl_data, 0);
 
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
