@@ -7,15 +7,16 @@
 
 #include "jwt.h"
 #include "IPStack.h"
-#include "HubControllerEnums.h"
+#include "HubEnums.h"
 
 #include <vector>
 
 #include "network_info.h"
+#include "EventBits.h"
 
 // #define JSMN_STATIC
 // #include "jsmn.h"
-
+/*
 #define THINGSPEAK_CERT "-----BEGIN CERTIFICATE-----\n\
 MIIDjjCCAnagAwIBAgIQAzrx5qcRqaC7KGSxHQn65TANBgkqhkiG9w0BAQsFADBh\n\
 MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3\n\
@@ -38,8 +39,9 @@ Fdtom/DzMNU+MeKNhJ7jitralj41E6Vf8PlwUHBHQRFXGU7Aj64GxJUTFy8bJZ91\n\
 pLiaWN0bfVKfjllDiIGknibVb63dDcY3fe0Dkhvld1927jyNxF1WW6LZZm6zNTfl\n\
 MrY=\n\
 -----END CERTIFICATE-----\n"
+*/
 
-#define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
+// #define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
 
 // enum class Commands {
 //     TOGGLE_PLUG,
@@ -53,11 +55,11 @@ MrY=\n\
 //     uint64_t device_id;
 // } HubCommand;
 
-#define JSMN_TOKENS_SIZE 20
+// #define JSMN_TOKENS_SIZE 20
 #define MINUTE_TO_MS 60 * 1000
 
-#define SEND_DATA_EVENT_BIT BIT6
-#define GET_ELEC_PRICE_EVENT_BIT BIT7
+// #define SEND_DATA_EVENT_BIT BIT6
+// #define GET_ELEC_PRICE_EVENT_BIT BIT7
 
 class CloudCommunication
 {
@@ -103,6 +105,7 @@ private:
     void get_electricity_price(std::vector<float> &price_vec);
     void connect_websocket();
     void parse_websocket_data();
+    void send_wifi_status(bool online);
     
     static void cloud_task(void *param);
 
