@@ -16,7 +16,7 @@ Uart::Uart(uart_port_t uart_port, int tx_pin, int rx_pin, QueueHandle_t event_q,
     uart_param_config(uart_port, &uart_config); 
     uart_set_pin(uart_port, tx_pin, rx_pin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    esp_err_t err = uart_driver_install(uart_port, 1024, 1024, 20, &uart_event_queue, 0);
+    esp_err_t err = uart_driver_install(uart_port, 1024, 1024, 10, &uart_event_queue, 0);
 
     if (err != ESP_OK) ESP_LOGE("UART", "error while initializing uart"); 
 

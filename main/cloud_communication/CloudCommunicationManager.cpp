@@ -1,6 +1,6 @@
-#include "CloudCommunication.h"
+#include "CloudCommunicationManager.h"
 
-const std::unordered_map<data_type_t, std::string> CloudCommunication::dataTypeToString = {
+const std::unordered_map<data_type_t, std::string> CloudCommunicationManager::dataTypeToString = {
     {data_type_t::DATA_TYPE_DEVICE_JOIN, "JOIN"},
     {data_type_t::DATA_TYPE_DEVICE_LEFT, "LEFT"},
     {data_type_t::DATA_TYPE_ELEC_PRICE, "PRICE"},
@@ -12,10 +12,11 @@ const std::unordered_map<data_type_t, std::string> CloudCommunication::dataTypeT
     {data_type_t::DATA_TYPE_THRESHOLD_LOW, "THR_LOW"},
     {data_type_t::DATA_TYPE_THRESHOLD_MED, "THR_MED"},
     {data_type_t::DATA_TYPE_VOLTAGE, "VOLTAGE"},
+    {data_type_t::DATA_TYPE_CURRENT, "CURRENT"},
     {data_type_t::DATA_TYPE_COMMAND, "COMMAND"},
 };
 
-const std::unordered_map<std::string_view, data_type_t> CloudCommunication::stringToDataType = {
+const std::unordered_map<std::string_view, data_type_t> CloudCommunicationManager::stringToDataType = {
     {"JOIN", data_type_t::DATA_TYPE_DEVICE_JOIN},
     {"LEFT", data_type_t::DATA_TYPE_DEVICE_LEFT},
     {"PRICE", data_type_t::DATA_TYPE_ELEC_PRICE},
@@ -27,27 +28,28 @@ const std::unordered_map<std::string_view, data_type_t> CloudCommunication::stri
     {"THR_LOW", data_type_t::DATA_TYPE_THRESHOLD_LOW},
     {"THR_MED", data_type_t::DATA_TYPE_THRESHOLD_MED},
     {"VOLTAGE", data_type_t::DATA_TYPE_VOLTAGE},
+    {"CURRENT", data_type_t::DATA_TYPE_CURRENT},
     {"COMMAND", data_type_t::DATA_TYPE_COMMAND},
 };
 
-CloudCommunication::CloudCommunication(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue) : uart(uart), controller_q(controller_queue), cloud_q(cloud_queue) {
+CloudCommunicationManager::CloudCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue) : uart(uart), controller_q(controller_queue), cloud_q(cloud_queue) {
     event_q = uart->get_event_queue(); 
 
-    xTaskCreate(CloudCommunication::runner_tx, "TX_TASK", 4096, NULL, tskIDLE_PRIORITY + 1, &tx_handle); 
-    xTaskCreate(CloudCommunication::runner_rx, "RX_TASK", 4096, NULL, tskIDLE_PRIORITY + 2, &rx_handle);
+    xTaskCreate(CloudCommunicationManager::runner_tx, "TX_TASK", 4096, this, tskIDLE_PRIORITY + 1, &tx_handle); 
+    xTaskCreate(CloudCommunicationManager::runner_rx, "RX_TASK", 4096, this, tskIDLE_PRIORITY + 2, &rx_handle);
 }
 
-void CloudCommunication::runner_tx(void *params) {
-    auto instance = static_cast<CloudCommunication *> (params); 
+void CloudCommunicationManager::runner_tx(void *params) {
+    auto instance = static_cast<CloudCommunicationManager *> (params); 
     instance->run_tx();
 }
 
-void CloudCommunication::runner_rx(void *params) {
-    auto instance = static_cast<CloudCommunication *> (params);
+void CloudCommunicationManager::runner_rx(void *params) {
+    auto instance = static_cast<CloudCommunicationManager *> (params);
     instance->run_rx();
 }
 
-void CloudCommunication::run_tx() {
+void CloudCommunicationManager::run_tx() {
 
     controller_data data{}; 
     std::string line{};
@@ -55,16 +57,16 @@ void CloudCommunication::run_tx() {
     while(true) {
         if (xQueueReceive(cloud_q, &data, portMAX_DELAY) == pdPASS) {
             line = convert_controller_data_to_json(data);
-            ESP_LOGI("CLOUD COMM", "sending line: %s", line);
-            esp_err_t err = uart->write(line);
-            if (err == ESP_OK) ESP_LOGI("CLOUD COMM", "sending successfull");
-            else ESP_LOGE("CLOUD COMM", "error while sending UART"); 
+            ESP_LOGI("CLOUD COMM", "sending line: %s", line.c_str());
+            //esp_err_t err = uart->write(line);
+            //if (err == ESP_OK) ESP_LOGI("CLOUD COMM", "sending successfull");
+            //else ESP_LOGE("CLOUD COMM", "error while sending UART"); 
             line.clear();
         }
     }
 }
 
-void CloudCommunication::run_rx() {
+void CloudCommunicationManager::run_rx() {
 
     uart_event_t event;
     std::string line{};
@@ -88,7 +90,7 @@ void CloudCommunication::run_rx() {
     }
 }
 
-std::string CloudCommunication::convert_controller_data_to_json(controller_data &data) {
+std::string CloudCommunicationManager::convert_controller_data_to_json(controller_data &data) { 
     if (data.type == DATA_TYPE_DEVICE_JOIN || data.type == DATA_TYPE_DEVICE_LEFT) {
         return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":0}}\n", data.device_id, convert_data_type_to_string(data.type));
     }
@@ -98,10 +100,13 @@ std::string CloudCommunication::convert_controller_data_to_json(controller_data 
     else if (data.type == DATA_TYPE_SET_ON || data.type == DATA_TYPE_ONLINE_STATE) {
         return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.flag);
     }
+    else if (data.type == DATA_TYPE_COMMAND) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), convert_command_type_to_string(data.data.command));
+    }
     else return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.value);    
 }
 
-controller_data CloudCommunication::convert_json_to_controller_data(std::string &line) {
+controller_data CloudCommunicationManager::convert_json_to_controller_data(std::string &line) {
     controller_data ctrl_data{};
 
     std::string_view id_view = value_extraction(line, "\"id\":");
@@ -123,28 +128,34 @@ controller_data CloudCommunication::convert_json_to_controller_data(std::string 
     if (ctrl_data.type == DATA_TYPE_DEVICE_LEFT || ctrl_data.type == DATA_TYPE_DEVICE_JOIN || ctrl_data.type == DATA_TYPE_PRIORITY) {
         std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value_int);
     } 
-    else if (ctrl_data.type == DATA_TYPE_SET_ON ||ctrl_data.type == DATA_TYPE_ONLINE_STATE) {
+    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE) {
         if (value_view == "true" || value_view == "1") ctrl_data.data.flag = true; 
         else ctrl_data.data.flag = false; 
+    }
+    else if (ctrl_data.type == DATA_TYPE_COMMAND) {
+        if (value_view == "ON") ctrl_data.data.command = PLUG_ON; 
+        else if (value_view == "OFF") ctrl_data.data.command = PLUG_OFF;
+        else if (value_view == "TOGGLE") ctrl_data.data.command = TOGGLE_PLUG; 
+        else ESP_LOGE("CLOUD_COMM", "UNKNOWN value_view command type."); 
     }
     else std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value); 
 
     return ctrl_data; 
 }
 
-std::string CloudCommunication::convert_data_type_to_string(data_type_t &type) {
+std::string CloudCommunicationManager::convert_data_type_to_string(data_type_t &type) {
     auto it = dataTypeToString.find(type); 
     if (it != dataTypeToString.end()) return it->second; 
     else return "UNKNOWN"; 
 }
 
-data_type_t CloudCommunication::convert_string_to_data_type(std::string_view string) {
+data_type_t CloudCommunicationManager::convert_string_to_data_type(std::string_view string) {
     auto it = stringToDataType.find(string);
     if (it != stringToDataType.end()) return it->second;
     else return DATA_TYPE_UNKNOWN;
 }
 
-std::string_view CloudCommunication::value_extraction(std::string_view line, std::string_view key) {
+std::string_view CloudCommunicationManager::value_extraction(std::string_view line, std::string_view key) {
     auto key_pos = line.find(key);
 
     if (key_pos == std::string_view::npos) return {};
@@ -160,4 +171,14 @@ std::string_view CloudCommunication::value_extraction(std::string_view line, std
     if (value_end_pos == std::string_view::npos) return {};
 
     return line.substr(value_start_pos, (value_end_pos - value_start_pos)); 
+}
+
+std::string CloudCommunicationManager::convert_command_type_to_string(commands &command) {
+    if (command == PLUG_ON) return "\"ON\"";
+    else if (command == PLUG_OFF) return "\"OFF\"";
+    else if (command == TOGGLE_PLUG) return "\"TOGGLE\"";
+    else {
+        ESP_LOGE("CLOUD COMM", "unknown command while converting to string");
+        return {}; 
+    }
 }

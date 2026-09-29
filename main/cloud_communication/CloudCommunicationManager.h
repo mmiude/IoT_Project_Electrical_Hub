@@ -10,9 +10,9 @@
 #include <unordered_map>
 #include <vector>
 
-class CloudCommunication {
+class CloudCommunicationManager {
 public:
-    CloudCommunication(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue);
+    CloudCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue);
 
 private: 
     static void runner_tx(void *params);
@@ -32,14 +32,12 @@ private:
     TaskHandle_t tx_handle;
     TaskHandle_t rx_handle; 
 
-    esp_err_t send_data(); 
-    esp_err_t read_data(); 
-
     std::string convert_controller_data_to_json(controller_data &data);
     controller_data convert_json_to_controller_data(std::string &line);
 
     std::string convert_data_type_to_string(data_type_t &type);
     data_type_t convert_string_to_data_type(std::string_view string); 
+    std::string convert_command_type_to_string(commands &command);
 
     std::string_view value_extraction(std::string_view line, std::string_view key);
 

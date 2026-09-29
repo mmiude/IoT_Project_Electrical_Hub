@@ -52,16 +52,19 @@ void HubController::run(){
                 threshold_low = ctrl_data.data.value;
                 check_low_thresholds();
                 system_config_storage->save_low_threshold(ctrl_data.data.value);
+                xQueueSendToBack(cloud_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_THRESHOLD_MED:
                 ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value); 
                 threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
                 system_config_storage->save_med_threshold(ctrl_data.data.value);
+                xQueueSendToBack(cloud_queue, &ctrl_data, 0);
                 break; 
             case DATA_TYPE_PRIORITY: 
                 modify_dev_priority(ctrl_data.device_id, ctrl_data.data.value_int);
                 ESP_LOGI(TAG, "new device priority recieved"); 
+                xQueueSendToBack(cloud_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_AUTOMATION:
                 modify_dev_automation(ctrl_data.device_id, ctrl_data.data.flag);
@@ -125,6 +128,7 @@ void HubController::handle_zigbee_events(controller_data &data){
         devices.erase(data.device_id);
         //ESP_LOGI(TAG, "Device erased from Hub map.");
         xQueueSendToBack(ui_queue, &data, 0);
+        xQueueSendToBack(cloud_queue, &data, 0);
         device_info_storage->delete_device_from_memory(data.device_id); 
         break;
     case DATA_TYPE_POWER:
@@ -132,6 +136,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->last_seen = xTaskGetTickCount(); 
             //ESP_LOGI(TAG, "Power update %.2f", data.data.value);
             xQueueSendToBack(ui_queue, &data, 0);
+            xQueueSendToBack(cloud_queue, &data, 0);
         }  
         break;
     case DATA_TYPE_ENERGY:
@@ -139,20 +144,21 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "Energy update %.2f", data.data.value);
             xQueueSendToBack(ui_queue, &data, 0);
+            xQueueSendToBack(cloud_queue, &data, 0);
         } 
         break;
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "Current update %.2f", data.data.value);
-            //only cloud
+            xQueueSendToBack(cloud_queue, &data, 0);
         } 
         break;
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
             dev->last_seen = xTaskGetTickCount();
             ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
-            //only cloud
+            xQueueSendToBack(cloud_queue, &data, 0);
         }  
         break;
     case DATA_TYPE_SET_ON:
@@ -163,6 +169,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id); 
             //if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
             xQueueSendToBack(ui_queue, &data, 0);
+            xQueueSendToBack(cloud_queue, &data, 0);
         }  
         break;
     case DATA_TYPE_REPORTING:
@@ -320,12 +327,14 @@ void HubController::periodic_device_check(){
             if (dev.online) {
                 ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = false}}; // we send to ui only if state has changed
                 xQueueSendToBack(ui_queue, &ctrl_data, 0); 
+                xQueueSendToBack(cloud_queue, &ctrl_data, 0);
             }
             dev.online = false;
         } else {
             if (!dev.online) {
                 ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = true}}; // we send to ui only if state has changed
                 xQueueSendToBack(ui_queue, &ctrl_data, 0); 
+                xQueueSendToBack(cloud_queue, &ctrl_data, 0);
             }
             dev.online = true; 
         } 
