@@ -35,7 +35,7 @@
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
-// #define API_HOSTNAME "10.161.4.38"
+// #define API_HOSTNAME "10.161.4.45"
 #define API_HOSTNAME "192.168.101.105"
 #define API_PORT 3000
 #define WS_PORT 8080
@@ -70,7 +70,8 @@ private:
 
     EventGroupHandle_t eg;
     QueueHandle_t ws_q;
-    QueueHandle_t rx_queue;
+    // QueueHandle_t rx_queue;
+    QueueHandle_t wifi_q;
 
     TaskHandle_t wifi_task_handle;
 
@@ -83,12 +84,12 @@ private:
     std::string ssid_key = "ssid_key";
     std::string pw_key = "pw_key";
 
-    bool get_wifi_credentials_from_uart(std::string &ssid, std::string &pw, TickType_t delay);
+    bool get_wifi_credentials_from_uart(std::string &str, TickType_t delay);
     static void wifi_task(void *param);
 
     // bool connected;
 public:
-    IPStack(EventGroupHandle_t event_group, QueueHandle_t _rx_queue);
+    IPStack(EventGroupHandle_t event_group, /*QueueHandle_t _rx_queue*/ QueueHandle_t _wifi_q);
     ~IPStack();
 
     bool connect_wifi(const char *ssid, const char *pw);

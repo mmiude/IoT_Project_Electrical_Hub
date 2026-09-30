@@ -69,11 +69,13 @@ private:
 
     // QueueHandle_t tb_command_q;
     // QueueHandle_t cloud_control_q;
-    QueueHandle_t rx_queue;
-    QueueHandle_t tx_queue;
+    // QueueHandle_t rx_queue;
+    // QueueHandle_t tx_queue;
+    QueueHandle_t cloud_q;
+    QueueHandle_t controller_q;
 
     TimerHandle_t elec_price_req_timer_h;
-    // TimerHandle_t cloud_comm_timer_h;
+    TimerHandle_t send_wifi_status_timer_h;
 
     TaskHandle_t cloud_task_handle;
 
@@ -97,7 +99,7 @@ private:
     // bool generate_hub_jwt(char *buffer, size_t size);
 
     static void elec_price_req_timer_cb(TimerHandle_t xTimer);
-    static void send_data_timer_cb(TimerHandle_t xTimer);
+    static void send_wifi_status_timer_cb(TimerHandle_t xTimer);
 
     void validate_hub();
     // void read_data();
@@ -116,7 +118,9 @@ private:
 
 public:
     CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, 
-        QueueHandle_t _rx_queue, QueueHandle_t _tx_queue);
+        /*QueueHandle_t _rx_queue, QueueHandle_t _tx_queue*/
+        QueueHandle_t _cloud_q, QueueHandle_t _controller_q
+    );
     ~CloudCommunication();
 };
 

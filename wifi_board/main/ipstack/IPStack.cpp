@@ -8,8 +8,8 @@ bool get_efuse_mac(uint8_t *mac)
     return esp_efuse_mac_get_default(mac) == ESP_OK;
 }
 
-IPStack::IPStack(EventGroupHandle_t event_group, QueueHandle_t _rx_queue)
-: eg(event_group), rx_queue(_rx_queue), storage("wifi_storage") /*, connected(false)*/
+IPStack::IPStack(EventGroupHandle_t event_group, QueueHandle_t _wifi_q)
+: eg(event_group), wifi_q(_wifi_q), storage("wifi_storage") /*, connected(false)*/
 {
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -37,59 +37,218 @@ IPStack::~IPStack()
     }
 }
 
+// void IPStack::wifi_task(void *param)
+// {
+//     auto ipstack = static_cast<IPStack*>(param);
+//     auto storage = ipstack->storage;
+
+//     bool got_ssid = false;
+//     bool got_pw = false;
+//     std::string ssid;
+//     std::string pw;
+//     controller_data ctrl_data = {};
+
+//     while (true) {
+//         EventBits_t wifi_bits = ipstack->get_wifi_bits(pdMS_TO_TICKS(100));
+
+//         if (wifi_bits & WIFI_CONNECTED_BIT) {
+//             // Wait up to 500ms for incoming credential updates when connected
+//             if (xQueueReceive(ipstack->wifi_q, &ctrl_data, pdMS_TO_TICKS(500)) == pdTRUE) {
+//                 if (ctrl_data.type == DATA_TYPE_WIFI_SSID) {
+//                     ssid = ctrl_data.data.c_value;
+//                     got_ssid = true;
+//                 } else if (ctrl_data.type == DATA_TYPE_WIFI_PW) {
+//                     pw = ctrl_data.data.c_value;
+//                     got_pw = true;
+//                 }
+
+//                 if (got_ssid && got_pw) {
+//                     ESP_LOGI(TAG, "Got new wifi ssid and pw, re-connecting...");
+//                     ipstack->disconnect_wifi();
+//                     got_ssid = false;
+//                     got_pw = false;
+//                 }
+//             } else {
+//                 // Ensure the task sleeps to yield CPU time to IDLE task
+//                 vTaskDelay(pdMS_TO_TICKS(100));
+//             }
+//         } else {
+//             // When disconnected, load credentials from NVS or wait on queue
+//             if (ssid.empty() || pw.empty()) {
+//                 esp_err_t ssid_err = storage.read_string(ipstack->ssid_key, ssid);
+//                 esp_err_t pw_err = storage.read_string(ipstack->pw_key, pw);
+
+//                 if (ssid_err != ERR_OK || pw_err != ERR_OK) {
+//                     // Block for up to 1 second waiting for credential messages
+//                     if (xQueueReceive(ipstack->wifi_q, &ctrl_data, pdMS_TO_TICKS(1000)) == pdTRUE) {
+//                         if (ctrl_data.type == DATA_TYPE_WIFI_SSID) {
+//                             ssid = ctrl_data.data.c_value;
+//                         } else if (ctrl_data.type == DATA_TYPE_WIFI_PW) {
+//                             pw = ctrl_data.data.c_value;
+//                         }
+//                     }
+//                 }
+//             } else {
+//                 bool connected = ipstack->connect_wifi(ssid.c_str(), pw.c_str());
+//                 if (connected) {
+//                     ESP_LOGI(TAG, "Wifi connected");
+//                     storage.write_string(ipstack->ssid_key, ssid);
+//                     storage.write_string(ipstack->pw_key, pw);
+//                 } else {
+//                     ESP_LOGE(TAG, "Wifi connect failed");
+//                     storage.erase_key(ipstack->ssid_key);
+//                     storage.erase_key(ipstack->pw_key);
+//                 }
+//                 ssid.clear();
+//                 pw.clear();
+//                 got_ssid = false;
+//                 got_pw = false;
+//             }
+//             vTaskDelay(pdMS_TO_TICKS(50));
+//         }
+//     }
+// }
+
 void IPStack::wifi_task(void *param)
 {
     auto ipstack = static_cast<IPStack*>(param);
     auto storage = ipstack->storage;
 
-    // controller_data ctrl_data = {};
+    bool got_ssid = false;
+    bool got_pw = false;
     std::string ssid;
     std::string pw;
+    controller_data ctrl_data = {};
     while (true) {
         EventBits_t wifi_bits = ipstack->get_wifi_bits(pdMS_TO_TICKS(500));
 
-        // If wifi connected. Allow to get new credentials from hub
-        if (wifi_bits & WIFI_CONNECTED_BIT
-            && ipstack->get_wifi_credentials_from_uart(ssid, pw, pdMS_TO_TICKS(500))
-        ) {
-            ipstack->disconnect_wifi();
-        }
-        // If not wifi connected and if ssid or pw is empty. Get credentials from nvs or hub
-        else if (ssid.empty() || pw.empty()) {
-            esp_err_t ssid_err = storage.read_string(ipstack->ssid_key, ssid);
-            esp_err_t pw_err = storage.read_string(ipstack->pw_key, pw);
-            if (ssid_err != ERR_OK || pw_err != ERR_OK) {
-                ESP_LOGI(TAG, "No wifi credentials in nvs. Waiting from uart...");
-                ipstack->get_wifi_credentials_from_uart(ssid, pw, portMAX_DELAY);
+        if (wifi_bits & WIFI_CONNECTED_BIT) {
+            // When connected, only listen for new credentials from UART to force disconnect
+            got_ssid = false;
+            got_pw = false;
+            if (xQueueReceive(ipstack->wifi_q, &ctrl_data, pdMS_TO_TICKS(500)) == pdTRUE) {
+                if (ctrl_data.type == DATA_TYPE_WIFI_SSID) {
+                    ssid = ctrl_data.data.c_value;
+                    got_ssid = true;
+                }
+                if (ctrl_data.type == DATA_TYPE_WIFI_PW) {
+                    pw = ctrl_data.data.c_value;
+                    got_pw = true;
+                }
             }
-        }
-        // Credentials found. Connect to wifi
-        else {
-            bool connected = ipstack->connect_wifi(ssid.c_str(), pw.c_str());
-            if (connected) {
-                ESP_LOGI(TAG, "Wifi connected");
-                storage.write_string(ipstack->ssid_key, ssid);
-                storage.write_string(ipstack->pw_key, pw);
+            if (got_ssid && got_pw) {
+                ESP_LOGI(TAG, "Got new wifi credentials reconnecting...");
+                ipstack->disconnect_wifi();
+            }
+            // if (xQueueReceive(ipstack->wifi_q, &ctrl_data, pdMS_TO_TICKS(100)) == pdTRUE
+            //     && ctrl_data.type == DATA_TYPE_WIFI_SSID
+            // ) {
+            //     // got_ssid = ipstack->get_wifi_credentials_from_uart(ssid, 0);
+            //     ssid = ctrl_data.data.c_value;
+            //     got_ssid = true;
+            // }
+            // if (xQueueReceive(ipstack->wifi_q, &ctrl_data, pdMS_TO_TICKS(100)) == pdTRUE
+            //     && ctrl_data.type == DATA_TYPE_WIFI_PW
+            // ) {
+            //     pw = ctrl_data.data.c_value;
+            //     got_pw = true;
+            //     // got_pw = ipstack->get_wifi_credentials_from_uart(pw, 0);
+            // }
+            // bool got_pw = ipstack->get_wifi_credentials_from_uart(pw, pdMS_TO_TICKS(500));
+            // if (got_ssid && got_pw) {
+            //     ESP_LOGI(TAG, "Got wifi ssid and pw");
+            //     ipstack->disconnect_wifi();
+            // }
+        } else {
+            // When disconnected, fetch credentials from NVS/UART and connect
+            if (ssid.empty() || pw.empty()) {
+                esp_err_t ssid_err = storage.read_string(ipstack->ssid_key, ssid);
+                esp_err_t pw_err = storage.read_string(ipstack->pw_key, pw);
+                if (ssid_err != ERR_OK || pw_err != ERR_OK) {
+                    // ESP_LOGI(TAG, "No wifi credentials in nvs. Waiting from uart...");
+                    if (xQueueReceive(ipstack->wifi_q, &ctrl_data, portMAX_DELAY) == pdTRUE) {
+                        if (ctrl_data.type == DATA_TYPE_WIFI_SSID) {
+                            ssid = ctrl_data.data.c_value;
+                            got_ssid = true;
+                        }
+                        if (ctrl_data.type == DATA_TYPE_WIFI_PW) {
+                            pw = ctrl_data.data.c_value;
+                            got_pw = true;
+                        }
+                        // if (got_ssid && got_pw) {
+                        //     ESP_LOGI(TAG, "Got new wifi credentials reconnecting...");
+                        //     ipstack->disconnect_wifi();
+                        // }
+                    }
+                    if (got_ssid && got_pw) {
+                        ESP_LOGI(TAG, "Got wifi ssid and pw");
+                    }
+
+                    // if (xQueueReceive(ipstack->wifi_q, &ctrl_data, portMAX_DELAY) == pdTRUE
+                    //     && ctrl_data.type == DATA_TYPE_WIFI_SSID
+                    // ) {
+                    //     ssid = ctrl_data.data.c_value;
+                    //     got_ssid = true;
+                    // }
+                    // if (xQueueReceive(ipstack->wifi_q, &ctrl_data, portMAX_DELAY) == pdTRUE
+                    //     && ctrl_data.type == DATA_TYPE_WIFI_PW
+                    // ) {
+                    //     pw = ctrl_data.data.c_value;
+                    //     got_pw = true;
+                    // }
+                    // if (got_ssid && got_pw) {
+                    //     ESP_LOGI(TAG, "Got wifi ssid and pw");
+                    // }
+                            // ipstack->get_wifi_credentials_from_uart(ssid, pw, portMAX_DELAY);
+                    // ipstack->get_wifi_credentials_from_uart(ssid, portMAX_DELAY);
+                    // ipstack->get_wifi_credentials_from_uart(pw, portMAX_DELAY);
+                }
             } else {
-                ESP_LOGE(TAG, "Wifi connect failed");
+                bool connected = ipstack->connect_wifi(ssid.c_str(), pw.c_str());
+                if (connected) {
+                    ESP_LOGI(TAG, "Wifi connected");
+                    storage.write_string(ipstack->ssid_key, ssid);
+                    storage.write_string(ipstack->pw_key, pw);
+                } else {
+                    ESP_LOGE(TAG, "Wifi connect failed");
+                    storage.erase_key(ipstack->ssid_key);
+                    storage.erase_key(ipstack->pw_key);
+                }
+                ssid = "";
+                pw = "";
+                got_ssid = false;
+                got_pw = false;
             }
-            ssid = "";
-            pw = "";
         }
     }
 }
 
-bool IPStack::get_wifi_credentials_from_uart(std::string &ssid, std::string &pw, TickType_t delay)
+bool IPStack::get_wifi_credentials_from_uart(std::string &str, TickType_t delay)
 {
     controller_data ctrl_data = {};
-    if (xQueueReceive(rx_queue, &ctrl_data, delay) == pdTRUE
-        && ctrl_data.type == DATA_TYPE_WIFI_CREDENTIALS
-    ) {
-        ssid = ctrl_data.data.wifi.ssid;
-        pw = ctrl_data.data.wifi.pw;
+    if (xQueueReceive(wifi_q, &ctrl_data, 0)) {
+        str = ctrl_data.data.c_value;
         return true;
     }
     return false;
+    // if (xQueuePeek(wifi_q, &ctrl_data, delay) == pdTRUE
+    //     && (ctrl_data.type == DATA_TYPE_WIFI_SSID || ctrl_data.type == DATA_TYPE_WIFI_PW)
+    // ) {
+        // if (ctrl_data.type == DATA_TYPE_WIFI_SSID) {
+        //     xQueueReceive(wifi_q, &ctrl_data, 0);
+        //     str = ctrl_data.data.c_value;
+        // } else if (ctrl_data.type == DATA_TYPE_WIFI_PW) {
+        //     xQueueReceive(wifi_q, &ctrl_data, 0);
+        //     str = ctrl_data.data.c_value;
+        // }
+    //     if (xQueueReceive(wifi_q, &ctrl_data, 0) == pdTRUE) {
+    //         str = ctrl_data.data.c_value;
+    //         // pw = ctrl_data.data.wifi.pw;
+    //         return true;
+    //     }
+    //     return false;
+    // }
+    // return false;
 }
 
 // void IPStack::unsuspend_wifi_task()
@@ -100,11 +259,14 @@ bool IPStack::get_wifi_credentials_from_uart(std::string &ssid, std::string &pw,
 
 EventBits_t IPStack::get_wifi_bits(TickType_t delay)
 {
+    // ESP_LOGI(TAG, "Waiting for wifi bits");
     EventBits_t bits = xEventGroupWaitBits(eg,
         WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
         pdFALSE,
         pdFALSE,
         delay);
+    // ESP_LOGI(TAG, "Got wifi bits");
+
 
     return bits;
 }
@@ -189,6 +351,7 @@ void IPStack::disconnect_wifi()
     }
 
     xEventGroupSetBits(eg, WIFI_FAIL_BIT);
+    xEventGroupClearBits(eg, WIFI_CONNECTED_BIT);
     ESP_LOGI(TAG, "Wifi disconnected");
 }
 
@@ -206,6 +369,7 @@ void IPStack::wifi_event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "retry to connect to the AP");
         } else {
             xEventGroupSetBits(ipstack->eg, WIFI_FAIL_BIT);
+            xEventGroupClearBits(ipstack->eg, WIFI_CONNECTED_BIT);
         }
         ESP_LOGI(TAG, "connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -466,7 +630,7 @@ esp_err_t IPStack::init_websocket(const char *uri)
     ws_cfg.uri = uri;
     ws_cfg.network_timeout_ms = WEBSOCKET_NETWORK_TIMEOUT_MS; // Explicitly set network timeout
     ws_cfg.ping_interval_sec = 10;
-    ws_cfg.pingpong_timeout_sec = 30; 
+    ws_cfg.pingpong_timeout_sec = 5; 
 
     ws_client = esp_websocket_client_init(&ws_cfg);
     if (ws_client == nullptr) return ESP_ERR_NO_MEM;
