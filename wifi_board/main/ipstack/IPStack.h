@@ -21,18 +21,21 @@
 #include "network_info.h"
 #include "map"
 #include "string"
+#include "EventBits.h"
+#include "HubEnums.h"
+#include "NvsStorage.h"
+#include "string"
 
-#define WIFI_CONNECTED_BIT      BIT0
-#define WIFI_FAIL_BIT           BIT1 
-#define DEVICE_SIGN_READY       BIT2 
-#define ON_WIFI_CONNECT_BIT     BIT4
-#define WEBSOCKET_CONNECTED_BIT BIT8
-#define WEBSOCKET_ERROR_BIT     BIT9
+// #define WIFI_CONNECTED_BIT      BIT0
+// #define WIFI_FAIL_BIT           BIT1 
+// #define ON_WIFI_CONNECT_BIT     BIT2
+// #define WEBSOCKET_CONNECTED_BIT BIT8
+// #define WEBSOCKET_ERROR_BIT     BIT9
 
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
-// #define API_HOSTNAME "10.161.4.38"
+// #define API_HOSTNAME "10.161.4.45"
 #define API_HOSTNAME "192.168.101.105"
 #define API_PORT 3000
 #define WS_PORT 8080
@@ -67,20 +70,31 @@ private:
 
     EventGroupHandle_t eg;
     QueueHandle_t ws_q;
+    // QueueHandle_t rx_queue;
+    QueueHandle_t wifi_q;
+
+    TaskHandle_t wifi_task_handle;
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
 
     esp_websocket_client_handle_t ws_client = nullptr;
 
+    NvsStorage storage;
+    std::string ssid_key = "ssid_key";
+    std::string pw_key = "pw_key";
+
+    bool get_wifi_credentials_from_uart(std::string &str, TickType_t delay);
+    static void wifi_task(void *param);
+
     // bool connected;
 public:
-    IPStack(EventGroupHandle_t event_group);
+    IPStack(EventGroupHandle_t event_group, /*QueueHandle_t _rx_queue*/ QueueHandle_t _wifi_q);
     ~IPStack();
 
     bool connect_wifi(const char *ssid, const char *pw);
     void disconnect_wifi();
-    bool wait_for_wifi();
+    EventBits_t get_wifi_bits(TickType_t delay);
 
     bool http_request(const char *hostname, int port, char *response_buff,
                     const char *path = "/", const char *query = "", const char *body_data = "",
@@ -92,7 +106,10 @@ public:
                     std::map<std::string, std::string> headers = {});
 
     esp_err_t init_websocket(const char *uri);
+    esp_err_t deinit_websocket();
     bool get_websocket_data(t_websocket_data *ws_data, int timeout_ms);
+
+    void unsuspend_wifi_task();
     
     // bool operator()();
 };
