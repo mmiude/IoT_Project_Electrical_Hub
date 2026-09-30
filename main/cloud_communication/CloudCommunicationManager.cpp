@@ -58,9 +58,9 @@ void CloudCommunicationManager::run_tx() {
         if (xQueueReceive(cloud_q, &data, portMAX_DELAY) == pdPASS) {
             line = convert_controller_data_to_json(data);
             ESP_LOGI("CLOUD COMM", "sending line: %s", line.c_str());
-            //esp_err_t err = uart->write(line);
-            //if (err == ESP_OK) ESP_LOGI("CLOUD COMM", "sending successfull");
-            //else ESP_LOGE("CLOUD COMM", "error while sending UART"); 
+            esp_err_t err = uart->write(line);
+            if (err == ESP_OK) ESP_LOGI("CLOUD COMM", "sending successfull");
+            else ESP_LOGE("CLOUD COMM", "error while sending UART"); 
             line.clear();
         }
     }
@@ -75,7 +75,7 @@ void CloudCommunicationManager::run_rx() {
         if (xQueueReceive(event_q, &event, portMAX_DELAY) == pdPASS) {
             if (event.type == UART_DATA) {
                 if (uart->read_line(event.size, line) == ESP_OK) {
-                    ESP_LOGI("CLOUD COMM", "received json: %s", line); 
+                    ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
                     controller_data data = convert_json_to_controller_data(line);
                     ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
                     xQueueSendToBack(controller_q, &data, 0);

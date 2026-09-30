@@ -167,7 +167,7 @@ extern "C" void app_main(void)
     static auto sysConfStorage = std::make_shared<SystemConfigStorage>(); // still needed for thresholds; wifi saving is disabled above
     static auto uiStorage = std::make_shared<DeviceInfoStorage<UiDeviceRecord>>("ui_ns", "ui_dev_info");
 
-    static auto leds = std::make_shared<Led>(GPIO_NUM_23, GPIO_NUM_22, GPIO_NUM_21); 
+    static auto leds = std::make_shared<Led>(GPIO_NUM_5, GPIO_NUM_4, GPIO_NUM_3); 
 
     //coordinatorStorage->erase_name_space();
     //controllerStorage->erase_name_space();
