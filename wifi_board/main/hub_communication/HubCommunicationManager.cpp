@@ -1,0 +1,201 @@
+#include "HubCommunicationManager.h"
+
+const std::unordered_map<data_type_t, std::string> HubCommunicationManager::dataTypeToString = {
+    {data_type_t::DATA_TYPE_DEVICE_JOIN, "JOIN"},
+    {data_type_t::DATA_TYPE_DEVICE_LEFT, "LEFT"},
+    {data_type_t::DATA_TYPE_ELEC_PRICE, "PRICE"},
+    {data_type_t::DATA_TYPE_ENERGY, "ENERGY"},
+    {data_type_t::DATA_TYPE_ONLINE_STATE, "ONLINE"},
+    {data_type_t::DATA_TYPE_POWER, "POWER"},
+    {data_type_t::DATA_TYPE_PRIORITY, "PRIO"},
+    {data_type_t::DATA_TYPE_SET_ON, "STATE"},
+    {data_type_t::DATA_TYPE_THRESHOLD_LOW, "THR_LOW"},
+    {data_type_t::DATA_TYPE_THRESHOLD_MED, "THR_MED"},
+    {data_type_t::DATA_TYPE_VOLTAGE, "VOLTAGE"},
+    {data_type_t::DATA_TYPE_CURRENT, "CURRENT"},
+    {data_type_t::DATA_TYPE_COMMAND, "COMMAND"},
+    {data_type_t::DATA_TYPE_WIFI_ONLINE, "WIFI_ONLINE"},
+    {data_type_t::DATA_TYPE_DEVICE_NAME, "DEVICE_NAME"},
+    { data_type_t::DATA_TYPE_HUB_ID, "HUB_ID"}
+};
+
+const std::unordered_map<std::string_view, data_type_t> HubCommunicationManager::stringToDataType = {
+    {"JOIN", data_type_t::DATA_TYPE_DEVICE_JOIN},
+    {"LEFT", data_type_t::DATA_TYPE_DEVICE_LEFT},
+    {"PRICE", data_type_t::DATA_TYPE_ELEC_PRICE},
+    {"ENERGY", data_type_t::DATA_TYPE_ENERGY},
+    {"ONLINE", data_type_t::DATA_TYPE_ONLINE_STATE},
+    {"POWER", data_type_t::DATA_TYPE_POWER},
+    {"PRIO", data_type_t::DATA_TYPE_PRIORITY},
+    {"STATE", data_type_t::DATA_TYPE_SET_ON},
+    {"THR_LOW", data_type_t::DATA_TYPE_THRESHOLD_LOW},
+    {"THR_MED", data_type_t::DATA_TYPE_THRESHOLD_MED},
+    {"VOLTAGE", data_type_t::DATA_TYPE_VOLTAGE},
+    {"CURRENT", data_type_t::DATA_TYPE_CURRENT},
+    {"COMMAND", data_type_t::DATA_TYPE_COMMAND},
+    {"WIFI_ONLINE", data_type_t::DATA_TYPE_WIFI_ONLINE},
+    {"DEVICE_NAME", data_type_t::DATA_TYPE_DEVICE_NAME},
+    {"HUB_ID", data_type_t::DATA_TYPE_HUB_ID}
+};
+
+// HubCommunicationManager::HubCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue) : uart(uart), controller_q(controller_queue), cloud_q(cloud_queue) {
+HubCommunicationManager::HubCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t cloud_queue, QueueHandle_t controller_queue, QueueHandle_t wifi_queue)
+: uart(uart), cloud_q(cloud_queue), controller_q(controller_queue), wifi_q(wifi_queue)
+{  
+    event_q = uart->get_event_queue(); 
+
+    xTaskCreate(HubCommunicationManager::runner_tx, "TX_TASK", 4096, this, tskIDLE_PRIORITY + 1, &tx_handle); 
+    xTaskCreate(HubCommunicationManager::runner_rx, "RX_TASK", 4096, this, tskIDLE_PRIORITY + 2, &rx_handle);
+}
+
+void HubCommunicationManager::runner_tx(void *params) {
+    auto instance = static_cast<HubCommunicationManager *> (params); 
+    instance->run_tx();
+}
+
+void HubCommunicationManager::runner_rx(void *params) {
+    auto instance = static_cast<HubCommunicationManager *> (params);
+    instance->run_rx();
+}
+
+void HubCommunicationManager::run_tx() {
+
+    controller_data data{}; 
+    std::string line{};
+
+    while(true) {
+        if (xQueueReceive(controller_q, &data, portMAX_DELAY) == pdPASS) {
+            line = convert_controller_data_to_json(data);
+            ESP_LOGI("CLOUD COMM", "sending line: %s", line.c_str());
+            esp_err_t err = uart->write(line);
+            if (err == ESP_OK) ESP_LOGI("CLOUD COMM", "sending successfull");
+            else ESP_LOGE("CLOUD COMM", "error while sending UART"); 
+            line.clear();
+        }
+    }
+}
+
+void HubCommunicationManager::run_rx() {
+
+    uart_event_t event;
+    std::string line{};
+    
+    while(true) {
+        if (xQueueReceive(event_q, &event, portMAX_DELAY) == pdPASS) {
+            if (event.type == UART_DATA) {
+                if (uart->read_line(event.size, line) == ESP_OK) {
+                    ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
+                    controller_data data = convert_json_to_controller_data(line);
+                    ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
+                    xQueueSendToBack(cloud_q, &data, 0);
+                    if (data.type == DATA_TYPE_WIFI_SSID || data.type == DATA_TYPE_WIFI_PW) {
+                        xQueueSendToBack(wifi_q, &data, 0);
+                    }
+                    line.clear(); 
+                } else ESP_LOGI("CLOUD COMM", "did not find new line"); 
+            } else if (event.type == UART_FIFO_OVF) { // do we need to check other types? 
+                ESP_LOGE("CLOUD COMM", "uart rx fifo overflow");
+                uart->flush();
+            }
+            else ESP_LOGI("CLOUD COMM", "uart event: %d", event.type); 
+        }
+    }
+}
+
+std::string HubCommunicationManager::convert_controller_data_to_json(controller_data &data) { 
+    if (data.type == DATA_TYPE_DEVICE_JOIN || data.type == DATA_TYPE_DEVICE_LEFT) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":0}}\n", data.device_id, convert_data_type_to_string(data.type));
+    }
+    else if (data.type == DATA_TYPE_PRIORITY) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.value_int);
+    }
+    else if (data.type == DATA_TYPE_SET_ON || data.type == DATA_TYPE_ONLINE_STATE || data.type == DATA_TYPE_WIFI_ONLINE) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.flag);
+    }
+    else if (data.type == DATA_TYPE_COMMAND) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), convert_command_type_to_string(data.data.command));
+    }
+    else if (data.type == DATA_TYPE_DEVICE_NAME || data.type == DATA_TYPE_HUB_ID) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":\"{}\"}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.c_value);
+        // Without: \" \":
+        // return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.c_value);
+    }
+    else return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.value);    
+}
+
+controller_data HubCommunicationManager::convert_json_to_controller_data(std::string &line) {
+    controller_data ctrl_data{};
+
+    std::string_view id_view = value_extraction(line, "\"id\":");
+    std::string_view type_view = value_extraction(line, "\"type\":");
+    std::string_view value_view = value_extraction(line, "\"value\":"); 
+
+    if (id_view.empty() || type_view.empty() || value_view.empty()){
+        ESP_LOGE("CLOUD COMM", "Failed to extract values from line");
+        ctrl_data.type = DATA_TYPE_UNKNOWN;
+        return ctrl_data; 
+    }
+
+    // convert id 
+    std::from_chars(id_view.data(), id_view.data() + id_view.size(), ctrl_data.device_id);
+
+    ctrl_data.type = convert_string_to_data_type(type_view); 
+
+    // depending on data type we convert the values:
+    if (ctrl_data.type == DATA_TYPE_DEVICE_LEFT || ctrl_data.type == DATA_TYPE_DEVICE_JOIN || ctrl_data.type == DATA_TYPE_PRIORITY) {
+        std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value_int);
+    } 
+    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE) {
+        if (value_view == "true" || value_view == "1") ctrl_data.data.flag = true; 
+        else ctrl_data.data.flag = false; 
+    }
+    else if (ctrl_data.type == DATA_TYPE_COMMAND) {
+        if (value_view == "ON") ctrl_data.data.command = PLUG_ON; 
+        else if (value_view == "OFF") ctrl_data.data.command = PLUG_OFF;
+        else if (value_view == "TOGGLE") ctrl_data.data.command = TOGGLE_PLUG; 
+        else ESP_LOGE("CLOUD_COMM", "UNKNOWN value_view command type."); 
+    }
+    else std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value); 
+
+    return ctrl_data; 
+}
+
+std::string HubCommunicationManager::convert_data_type_to_string(data_type_t &type) {
+    auto it = dataTypeToString.find(type); 
+    if (it != dataTypeToString.end()) return it->second; 
+    else return "UNKNOWN"; 
+}
+
+data_type_t HubCommunicationManager::convert_string_to_data_type(std::string_view string) {
+    auto it = stringToDataType.find(string);
+    if (it != stringToDataType.end()) return it->second;
+    else return DATA_TYPE_UNKNOWN;
+}
+
+std::string_view HubCommunicationManager::value_extraction(std::string_view line, std::string_view key) {
+    auto key_pos = line.find(key);
+
+    if (key_pos == std::string_view::npos) return {};
+
+    auto value_start_pos = key_pos + key.size();
+
+    //skipping starting " if string value
+    if (line.at(value_start_pos) == '"') value_start_pos++; 
+
+    //find ending char: must be either : " }
+    auto value_end_pos = line.find_first_of(",\"}", value_start_pos);
+
+    if (value_end_pos == std::string_view::npos) return {};
+
+    return line.substr(value_start_pos, (value_end_pos - value_start_pos)); 
+}
+
+std::string HubCommunicationManager::convert_command_type_to_string(commands &command) {
+    if (command == PLUG_ON) return "\"ON\"";
+    else if (command == PLUG_OFF) return "\"OFF\"";
+    else if (command == TOGGLE_PLUG) return "\"TOGGLE\"";
+    else {
+        ESP_LOGE("CLOUD COMM", "unknown command while converting to string");
+        return {}; 
+    }
+}
