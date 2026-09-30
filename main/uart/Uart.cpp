@@ -20,6 +20,8 @@ Uart::Uart(uart_port_t uart_port, int tx_pin, int rx_pin, QueueHandle_t event_q,
 
     if (err != ESP_OK) ESP_LOGE("UART", "error while initializing uart"); 
 
+    rx_buffer = {};
+
 }
 
 esp_err_t Uart::write(std::string &line) {
@@ -30,27 +32,33 @@ esp_err_t Uart::write(std::string &line) {
 
 esp_err_t Uart::read_line(size_t event_size, std::string &line) {
 
-    //char temp_buffer[256]; // and here as well 
-    std::vector<char> temp_buffer(event_size);
+    if (event_size > 0) {
+        std::vector<char> temp_buffer(event_size);
 
-    int read_bytes = uart_read_bytes(uart_port, temp_buffer.data(), event_size, 0);
+        int read_bytes = uart_read_bytes(uart_port, temp_buffer.data(), event_size, 0);
 
-    for (int i = 0; i < read_bytes; i++){
-        char byte = temp_buffer[i];
-        if (byte == '\n') {
-            return ESP_OK;
-        }
-        else if (byte == '\r') ESP_LOGI("UART", "skipping \r"); 
-        else line += byte; 
+        if (read_bytes > 0) rx_buffer.append(temp_buffer.data(), read_bytes);  
     }
+    size_t pos = rx_buffer.find('\n'); 
 
+    if (pos != std::string::npos) {
+        line = rx_buffer.substr(0, pos);
+        rx_buffer.erase(0, pos + 1);  
+
+        if (!line.empty() && line.back() == '\r') line.pop_back(); 
+        return ESP_OK;
+    }
     return ESP_ERR_NOT_FINISHED;
 }
-
+   
 esp_err_t Uart::flush() {
     return uart_flush(uart_port); 
 }
 
 QueueHandle_t Uart::get_event_queue() {
     return uart_event_queue; 
+}
+
+void Uart::clear_rx_buffer() {
+    rx_buffer.clear(); 
 }

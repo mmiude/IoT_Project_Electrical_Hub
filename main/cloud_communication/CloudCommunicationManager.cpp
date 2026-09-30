@@ -37,6 +37,7 @@ CloudCommunicationManager::CloudCommunicationManager(std::shared_ptr<Uart> uart,
 
     xTaskCreate(CloudCommunicationManager::runner_tx, "TX_TASK", 4096, this, tskIDLE_PRIORITY + 1, &tx_handle); 
     xTaskCreate(CloudCommunicationManager::runner_rx, "RX_TASK", 4096, this, tskIDLE_PRIORITY + 2, &rx_handle);
+
 }
 
 void CloudCommunicationManager::runner_tx(void *params) {
@@ -74,16 +75,24 @@ void CloudCommunicationManager::run_rx() {
     while(true) {
         if (xQueueReceive(event_q, &event, portMAX_DELAY) == pdPASS) {
             if (event.type == UART_DATA) {
-                if (uart->read_line(event.size, line) == ESP_OK) {
-                    ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
-                    controller_data data = convert_json_to_controller_data(line);
-                    ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
-                    xQueueSendToBack(controller_q, &data, 0);
+                while (uart->read_line(event.size, line) == ESP_OK) {
+
+                    if (line.empty() || line.front() != '{' || line.back() != '}') ESP_LOGW("CLOUD COMM", "invalid data received. no json"); 
+                    else {
+                        ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
+                        controller_data data = convert_json_to_controller_data(line);
+                        ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
+                        xQueueSendToBack(controller_q, &data, 0); 
+                    }
                     line.clear(); 
-                } else ESP_LOGI("CLOUD COMM", "did not find new line"); 
-            } else if (event.type == UART_FIFO_OVF) { // do we need to check other types? 
-                ESP_LOGE("CLOUD COMM", "uart rx fifo overflow");
+                    event.size = 0;
+                } 
+            } else if (event.type == UART_FIFO_OVF || event.type == UART_BUFFER_FULL) { 
+                ESP_LOGE("CLOUD COMM", "uart rx fifo overflow. resetting");
                 uart->flush();
+                uart->clear_rx_buffer(); 
+                xQueueReset(event_q);
+                line.clear();
             }
             else ESP_LOGI("CLOUD COMM", "uart event: %d", event.type); 
         }
