@@ -75,6 +75,8 @@ void HubController::run(){
                 price_received = true;
                 check_low_thresholds();
                 check_medium_thresholds();
+                // was missing (the ui price should update now)
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
                 ESP_LOGI(TAG, "requesting electrical values.");
@@ -84,9 +86,9 @@ void HubController::run(){
             case DATA_TYPE_COMMAND:
                 command_handler(ctrl_data);
                 break;
-            case DATA_TYPE_UI_SYNC_REQUEST:
-                send_ui_sync();
-                break;
+            // case DATA_TYPE_UI_SYNC_REQUEST:
+            //     send_ui_sync();
+            //     break;
             case DATA_TYPE_NETWORK_OPEN:
                 if (ctrl_data.data.flag) notify(Z_NETWORK_OPEN);
                 else notify(Z_NETWORK_CLOSE); 
@@ -96,7 +98,8 @@ void HubController::run(){
                 else notify(Z_NETWORK_DOWN);
                 break;
             case DATA_TYPE_WIFI_ONLINE:
-                if (!ctrl_data.data.flag) // notify ui -> wi-fi connection lost
+                // notify ui (wi-fi connection lost)
+                if (!ctrl_data.data.flag) 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);

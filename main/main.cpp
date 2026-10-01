@@ -139,11 +139,6 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
-    // wifi pondering 
-    // static auto sysConfStorage = std::make_shared<SystemConfigStorage>();
-    // std::string saved_ssid, saved_pwd;
-    // bool have_saved_wifi = sysConfStorage->get_wifi_info(saved_ssid, saved_pwd) == ESP_OK && !saved_ssid.empty();
-
     EventGroupHandle_t wifi_eg = xEventGroupCreate();
     //IPStack ipstack(wifi_eg);
     // if (have_saved_wifi) {
@@ -183,7 +178,7 @@ extern "C" void app_main(void)
 
     static SystemHealth systemHealthMonitor(wifi_eg, controllerQueue); 
 
-    static UiTask ui(controllerQueue, uiQueue, wifi_eg, uiStorage);
+    static UiTask ui(controllerQueue, cloudQueue, uiQueue, wifi_eg, uiStorage);
 
     static auto uart = std::make_shared<Uart>(UART_NUM_1, 16, 17, uart_events);
     static CloudCommunicationManager cloud_comm(uart, controllerQueue, cloudQueue);
