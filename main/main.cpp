@@ -144,7 +144,7 @@ extern "C" void app_main(void)
     // std::string saved_ssid, saved_pwd;
     // bool have_saved_wifi = sysConfStorage->get_wifi_info(saved_ssid, saved_pwd) == ESP_OK && !saved_ssid.empty();
 
-    EventGroupHandle_t wifi_eg = xEventGroupCreate();
+    EventGroupHandle_t wifi_eg = xEventGroupCreate(); // rename this! 
     //IPStack ipstack(wifi_eg);
     // if (have_saved_wifi) {
     //     ESP_LOGI(TAG, "connecting with saved wifi credentials (ssid: %s)", saved_ssid.c_str());

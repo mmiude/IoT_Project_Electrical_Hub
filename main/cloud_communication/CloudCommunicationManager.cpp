@@ -14,6 +14,11 @@ const std::unordered_map<data_type_t, std::string> CloudCommunicationManager::da
     {data_type_t::DATA_TYPE_VOLTAGE, "VOLTAGE"},
     {data_type_t::DATA_TYPE_CURRENT, "CURRENT"},
     {data_type_t::DATA_TYPE_COMMAND, "COMMAND"},
+    {data_type_t::DATA_TYPE_WIFI_ONLINE, "WIFI_ONLINE"},
+    {data_type_t::DATA_TYPE_DEVICE_NAME, "DEVICE_NAME"},
+    {data_type_t::DATA_TYPE_HUB_ID, "HUB_ID"},
+    {data_type_t::DATA_TYPE_WIFI_SSID, "SSID"},
+    {data_type_t::DATA_TYPE_WIFI_PW, "PW"}
 };
 
 const std::unordered_map<std::string_view, data_type_t> CloudCommunicationManager::stringToDataType = {
@@ -30,6 +35,11 @@ const std::unordered_map<std::string_view, data_type_t> CloudCommunicationManage
     {"VOLTAGE", data_type_t::DATA_TYPE_VOLTAGE},
     {"CURRENT", data_type_t::DATA_TYPE_CURRENT},
     {"COMMAND", data_type_t::DATA_TYPE_COMMAND},
+    {"WIFI_ONLINE", data_type_t::DATA_TYPE_WIFI_ONLINE},
+    {"DEVICE_NAME", data_type_t::DATA_TYPE_DEVICE_NAME},
+    {"HUB_ID", data_type_t::DATA_TYPE_HUB_ID},
+    {"SSID", data_type_t::DATA_TYPE_WIFI_SSID},
+    {"PW", data_type_t::DATA_TYPE_WIFI_PW}
 };
 
 CloudCommunicationManager::CloudCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue) : uart(uart), controller_q(controller_queue), cloud_q(cloud_queue) {
@@ -82,6 +92,7 @@ void CloudCommunicationManager::run_rx() {
                         ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
                         controller_data data = convert_json_to_controller_data(line);
                         ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
+                        // if we want to check wi-fi aliveness set bit here once received wifi online -> no need to send into a queue
                         xQueueSendToBack(controller_q, &data, 0); 
                     }
                     line.clear(); 
@@ -106,11 +117,14 @@ std::string CloudCommunicationManager::convert_controller_data_to_json(controlle
     else if (data.type == DATA_TYPE_PRIORITY) {
         return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.value_int);
     }
-    else if (data.type == DATA_TYPE_SET_ON || data.type == DATA_TYPE_ONLINE_STATE) {
+    else if (data.type == DATA_TYPE_SET_ON || data.type == DATA_TYPE_ONLINE_STATE || data.type == DATA_TYPE_WIFI_ONLINE) {
         return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.flag);
     }
     else if (data.type == DATA_TYPE_COMMAND) {
         return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), convert_command_type_to_string(data.data.command));
+    }
+    else if (data.type == DATA_TYPE_DEVICE_NAME || data.type == DATA_TYPE_HUB_ID || data.type == DATA_TYPE_WIFI_SSID || data.type == DATA_TYPE_WIFI_PW) {
+        return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":\"{}\"}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.c_value);
     }
     else return std::format("{{\"id\":{},\"type\":\"{}\",\"value\":{}}}\n", data.device_id, convert_data_type_to_string(data.type), data.data.value);    
 }
@@ -137,7 +151,7 @@ controller_data CloudCommunicationManager::convert_json_to_controller_data(std::
     if (ctrl_data.type == DATA_TYPE_DEVICE_LEFT || ctrl_data.type == DATA_TYPE_DEVICE_JOIN || ctrl_data.type == DATA_TYPE_PRIORITY) {
         std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value_int);
     } 
-    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE) {
+    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE || ctrl_data.type == DATA_TYPE_WIFI_ONLINE) {
         if (value_view == "true" || value_view == "1") ctrl_data.data.flag = true; 
         else ctrl_data.data.flag = false; 
     }
@@ -146,6 +160,9 @@ controller_data CloudCommunicationManager::convert_json_to_controller_data(std::
         else if (value_view == "OFF") ctrl_data.data.command = PLUG_OFF;
         else if (value_view == "TOGGLE") ctrl_data.data.command = TOGGLE_PLUG; 
         else ESP_LOGE("CLOUD_COMM", "UNKNOWN value_view command type."); 
+    }
+    else if (ctrl_data.type == DATA_TYPE_DEVICE_NAME || ctrl_data.type == DATA_TYPE_HUB_ID || ctrl_data.type == DATA_TYPE_WIFI_SSID || ctrl_data.type == DATA_TYPE_WIFI_PW) {
+        std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.c_value); 
     }
     else std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value); 
 
