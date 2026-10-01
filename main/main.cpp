@@ -144,7 +144,7 @@ extern "C" void app_main(void)
     // std::string saved_ssid, saved_pwd;
     // bool have_saved_wifi = sysConfStorage->get_wifi_info(saved_ssid, saved_pwd) == ESP_OK && !saved_ssid.empty();
 
-    EventGroupHandle_t wifi_eg = xEventGroupCreate();
+    EventGroupHandle_t sys_event_bits = xEventGroupCreate(); // rename this! 
     //IPStack ipstack(wifi_eg);
     // if (have_saved_wifi) {
     //     ESP_LOGI(TAG, "connecting with saved wifi credentials (ssid: %s)", saved_ssid.c_str());
@@ -175,15 +175,15 @@ extern "C" void app_main(void)
     //uiStorage->erase_name_space();
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
-        std::make_shared<ZigbeeCoordinator>(controllerQueue, wifi_eg, coordinatorStorage)
+        std::make_shared<ZigbeeCoordinator>(controllerQueue, sys_event_bits, coordinatorStorage)
     };
 
-    static HubController controller(protocols, wifi_eg, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
+    static HubController controller(protocols, sys_event_bits, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
     controller.attach(leds);
 
-    static SystemHealth systemHealthMonitor(wifi_eg, controllerQueue); 
+    static SystemHealth systemHealthMonitor(sys_event_bits, controllerQueue); 
 
-    static UiTask ui(controllerQueue, uiQueue, wifi_eg, uiStorage);
+    static UiTask ui(controllerQueue, uiQueue, sys_event_bits, uiStorage);
 
     static auto uart = std::make_shared<Uart>(UART_NUM_1, 16, 17, uart_events);
     static CloudCommunicationManager cloud_comm(uart, controllerQueue, cloudQueue);

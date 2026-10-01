@@ -17,6 +17,7 @@ public:
     esp_err_t write(std::string &line);
     esp_err_t read_line(size_t event_size, std::string &line); 
     esp_err_t flush(); 
+    void clear_rx_buffer();
     QueueHandle_t get_event_queue();
 
 private:
@@ -25,7 +26,8 @@ private:
     int rx_pin; 
     QueueHandle_t uart_event_queue; 
     int baud_rate; 
-    
+
+    std::string rx_buffer;
 };
 
 #endif //UART_H 

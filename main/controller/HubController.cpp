@@ -41,6 +41,7 @@ void HubController::run(){
     else check_device_map();
     system_config_storage->get_threshold_levels(threshold_low, threshold_medium); // if there is no values saved these returns zeros 
     ESP_LOGW(TAG, "read following values low: %f, med: %f", threshold_low, threshold_medium);
+    // here we can send sync to ui -> ui don't need to ask sync separately... 
     
     while (true) {
 
@@ -72,7 +73,7 @@ void HubController::run(){
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
-                price_received = true;
+                price_received = true; // DELETE! 
                 check_low_thresholds();
                 check_medium_thresholds();
                 break;
@@ -113,9 +114,9 @@ void HubController::handle_zigbee_events(controller_data &data){
 
     switch(data.type)
     {
-    case DATA_TYPE_DEVICE_JOIN:
+    case DATA_TYPE_DEVICE_JOIN: // check here the protocol -> add device info 
         devices.emplace(data.device_id, deviceInfo{
-            .priority = 0, // this will be taken off
+            .priority = 0, // this will be taken off - why?
             .online = true,
             .automation_on = true,
             .periodic_check_count = 0,
@@ -377,20 +378,20 @@ void HubController::remove_device(uint64_t dev_id) {
 // ------ ui 
 
 // short timeout 
-bool HubController::push_to_ui(controller_data &data){
+bool HubController::push_to_ui(controller_data &data){ // do we really need this? 
     return xQueueSendToBack(ui_queue, &data, pdMS_TO_TICKS(50)) == pdPASS;
 }
 
 void HubController::send_ui_sync(){
-    ESP_LOGI(TAG, "ui requested sync, replaying state.");
-    bool ok = true;
+    ESP_LOGI(TAG, "ui requested sync, replaying state."); // delete
+    bool ok = true; 
     controller_data msg{};
 
     msg = {.type = DATA_TYPE_THRESHOLD_LOW, .data = {.value = threshold_low}};
     ok &= push_to_ui(msg);
     msg = {.type = DATA_TYPE_THRESHOLD_MED, .data = {.value = threshold_medium}};
     ok &= push_to_ui(msg);
-    if (price_received) {
+    if (price_received) { // not this if cloud anyways sends this after boot -> comes naturally to controller and ui 
         msg = {.type = DATA_TYPE_ELEC_PRICE, .data = {.value = current_electricity_price}};
         ok &= push_to_ui(msg);
     }
@@ -398,13 +399,13 @@ void HubController::send_ui_sync(){
     for (auto &[key, dev] : devices) {
         msg = {.device_id = key, .type = DATA_TYPE_DEVICE_JOIN, .data = {}};
         ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}};
+        msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}}; // we could send only this -> so one message per dev in sync and set confirmed true under priority data type in ui model.cpp
         ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}};
+        msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}}; // controller has no uptodate info regarding this
         ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}};
+        msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}}; // sames as above
         ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}};
+        msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
         ok &= push_to_ui(msg);
     }
 
