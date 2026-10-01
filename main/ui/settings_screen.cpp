@@ -296,10 +296,6 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_obj_align(back_btn, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_add_event_cb(back_btn, back_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    // here's a possible idea for this,
-    // ssid/pass popup -> saves via UiModel::set_wifi_credentials -> hubcontroller -> nsv
-    // we need to boot up again tho...
-
     lv_obj_t *network_label = lv_label_create(scr);
     lv_label_set_text(network_label, "Network");
     lv_obj_set_style_text_color(network_label, lv_color_hex(0x999999), 0);
