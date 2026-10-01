@@ -6,7 +6,8 @@
 #define ZIGBEE_STACK_READY BIT3
 
 enum ProtocolIndex {
-    ZIGBEE
+    ZIGBEE,
+    FAKER
 };
 
 typedef enum {
@@ -22,7 +23,7 @@ typedef enum {
     PLUG_OFF,
     OPEN_NETWORK,
     // hub side remove only, Zigbee still lingers
-    REMOVE_DEVICE
+    REMOVE_DEVICE // remove this -> no time to make it work... 
 } commands;
 
 typedef struct device_info {
@@ -34,6 +35,7 @@ typedef struct device_info {
     bool reporting_on{};
     int periodic_check_count{};
     TickType_t last_seen{};
+    ProtocolIndex protocol;
 } deviceInfo;
 
 typedef enum {
@@ -64,6 +66,11 @@ typedef enum {
     // system health information
     DATA_TYPE_NETOWRK_ALIVE,
     DATA_TYPE_WIFI_ONLINE,
+    DATA_TYPE_WIFI_SSID,
+    DATA_TYPE_WIFI_PW,
+
+    DATA_TYPE_DEVICE_NAME,
+    DATA_TYPE_HUB_ID,
 
     DATA_TYPE_UNKNOWN,
     // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
@@ -81,6 +88,7 @@ typedef struct controller_queue_info {
         int value_int;
         bool flag;
         commands command;
+        char c_value[64]; //must be null terminated! always make sure if this is used it contains ending null! 
     } data;
 
 } controller_data;
