@@ -88,7 +88,7 @@ typedef struct controller_queue_info {
         int value_int;
         bool flag;
         commands command;
-        char c_value[64];
+        char c_value[64]; //must be null terminated! always make sure if this is used it contains ending null! 
     } data;
 
 } controller_data;

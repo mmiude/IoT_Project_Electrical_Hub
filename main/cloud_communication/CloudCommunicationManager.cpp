@@ -148,23 +148,25 @@ controller_data CloudCommunicationManager::convert_json_to_controller_data(std::
     ctrl_data.type = convert_string_to_data_type(type_view); 
 
     // depending on data type we convert the values:
-    if (ctrl_data.type == DATA_TYPE_DEVICE_LEFT || ctrl_data.type == DATA_TYPE_DEVICE_JOIN || ctrl_data.type == DATA_TYPE_PRIORITY) {
+    if (ctrl_data.type == DATA_TYPE_DEVICE_LEFT || ctrl_data.type == DATA_TYPE_DEVICE_JOIN || ctrl_data.type == DATA_TYPE_PRIORITY) { // int handling
         std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value_int);
     } 
-    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE || ctrl_data.type == DATA_TYPE_WIFI_ONLINE) {
+    else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE || ctrl_data.type == DATA_TYPE_WIFI_ONLINE) { // bool handling
         if (value_view == "true" || value_view == "1") ctrl_data.data.flag = true; 
         else ctrl_data.data.flag = false; 
     }
-    else if (ctrl_data.type == DATA_TYPE_COMMAND) {
+    else if (ctrl_data.type == DATA_TYPE_COMMAND) { // command struct handling
         if (value_view == "ON") ctrl_data.data.command = PLUG_ON; 
         else if (value_view == "OFF") ctrl_data.data.command = PLUG_OFF;
         else if (value_view == "TOGGLE") ctrl_data.data.command = TOGGLE_PLUG; 
         else ESP_LOGE("CLOUD_COMM", "UNKNOWN value_view command type."); 
     }
-    else if (ctrl_data.type == DATA_TYPE_DEVICE_NAME || ctrl_data.type == DATA_TYPE_HUB_ID || ctrl_data.type == DATA_TYPE_WIFI_SSID || ctrl_data.type == DATA_TYPE_WIFI_PW) {
-        std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.c_value); 
+    else if (ctrl_data.type == DATA_TYPE_DEVICE_NAME || ctrl_data.type == DATA_TYPE_HUB_ID || ctrl_data.type == DATA_TYPE_WIFI_SSID || ctrl_data.type == DATA_TYPE_WIFI_PW) { // string handling -> including null to end of char array
+        size_t count = std::min(value_view.size(), (size_t)sizeof(ctrl_data.data.c_value) - 1);
+        value_view.copy(ctrl_data.data.c_value, count);
+        ctrl_data.data.c_value[count] = '\0';
     }
-    else std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value); 
+    else std::from_chars(value_view.data(), value_view.data() + value_view.size(), ctrl_data.data.value); // float handling
 
     return ctrl_data; 
 }
