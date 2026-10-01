@@ -1,7 +1,7 @@
 #include "FakerProtocol.h"
 
-FakerProtocol::FakerProtocol(QueueHandle_t controller_q, EventGroupHandle_t e_bits) : controller_queue(controller_q), event_group(e_bits) {
-    init_demo_devices(); 
+FakerProtocol::FakerProtocol(QueueHandle_t controller_q, EventGroupHandle_t e_bits, std::shared_ptr<DeviceInfoStorage<f_dev>> storage) : controller_queue(controller_q), event_group(e_bits), dev_storage(storage) {
+    //init_demo_devices(); 
 
     f_event_queue = xQueueCreate(10, sizeof(f_data));
     xTaskCreate(FakerProtocol::runner, "FAKE_PROTOCOL", 2048, this, tskIDLE_PRIORITY + 1, &handle);
@@ -44,9 +44,17 @@ void FakerProtocol::runner(void *params){
 }
 
 void FakerProtocol::run() {
+    
+    dev_storage->get_all_devices(f_devices); 
+    if (f_devices.empty()) {
+        init_demo_devices();
+        for (auto [key, dev] : f_devices) {
+            controller_data data = {.device_id = dev.dev_id, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = FAKER}};
+            xQueueSendToBack(controller_queue, &data, 0);
+            vTaskDelay(10);
+        }
+    }
 
-    // if we save devs in memory read them first...
-    // if nothing init_demo_devs() -> send one by one to controller with DEV_JOIN + id + FAKER flag
     f_data event{};
     controller_data ctrl_data{};
 
@@ -72,21 +80,21 @@ void FakerProtocol::run() {
                 case CURRENT:
                      if (dev) {
                         vTaskDelay(10); // small delay to make it more realistic. 
-                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_VOLTAGE, .data = {.value = event.data.f_value}};
+                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_CURRENT, .data = {.value = event.data.f_value}};
                         xQueueSendToBack(controller_queue, &ctrl_data, 0); 
                     }
                     break;
                 case POWER:
                      if (dev) {
                         vTaskDelay(10); // small delay to make it more realistic. 
-                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_VOLTAGE, .data = {.value = event.data.f_value}};
+                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_POWER, .data = {.value = event.data.f_value}};
                         xQueueSendToBack(controller_queue, &ctrl_data, 0); 
                     }
                     break;
                 case STATE: 
                      if (dev) {
                         vTaskDelay(10); // small delay to make it more realistic. 
-                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_VOLTAGE, .data = {.flag = event.data.flag}};
+                        ctrl_data = {.device_id = dev->dev_id, .type = DATA_TYPE_SET_ON, .data = {.flag = event.data.flag}};
                         xQueueSendToBack(controller_queue, &ctrl_data, 0); 
                     }
                     break;
@@ -165,6 +173,10 @@ void FakerProtocol::set_plug_off(uint64_t device_id){
         xQueueSendToBack(f_event_queue, &data, 0);
     }
 }   
+
+void FakerProtocol::open_network() {
+    ESP_LOGI("FAKER:", "opening network..."); 
+}
 
 float FakerProtocol::get_voltage(const f_dev &dev){
     if (!dev.is_on) return 0.0; 
