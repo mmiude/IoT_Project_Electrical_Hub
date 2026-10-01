@@ -1,5 +1,5 @@
-#ifndef HUBCONTROLLERENUMS_H
-#define HUBCONTROLLERENUMS_H
+#ifndef HUB_ENUMS_H
+#define HUB_ENUMS_H
 
 #include <string>
 
@@ -22,7 +22,8 @@ typedef enum {
     PLUG_OFF,
     OPEN_NETWORK,
     // hub side remove only, Zigbee still lingers
-    REMOVE_DEVICE
+    REMOVE_DEVICE,
+    UNKNOWN
 } commands;
 
 typedef struct device_info {
@@ -40,6 +41,8 @@ typedef enum {
     // device lifecycle - coming from coordinator 
     DATA_TYPE_DEVICE_JOIN,
     DATA_TYPE_DEVICE_LEFT,
+    DATA_TYPE_DEVICE_ADDED,
+    DATA_TYPE_DEVICE_NAME,
     // measurements and metering/reporting support from coordinator
     DATA_TYPE_POWER,
     DATA_TYPE_ENERGY,
@@ -65,11 +68,19 @@ typedef enum {
     DATA_TYPE_NETOWRK_ALIVE,
     DATA_TYPE_WIFI_ONLINE,
 
-    DATA_TYPE_UNKNOWN,
     // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
     // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
     DATA_TYPE_UI_SYNC_REQUEST,
-    DATA_TYPE_UI_SYNC_DONE
+    DATA_TYPE_UI_SYNC_DONE,
+
+    DATA_TYPE_WIFI_CREDENTIALS,
+
+    DATA_TYPE_UNKNOWN,
+
+    DATA_TYPE_WIFI_SSID,
+    DATA_TYPE_WIFI_PW,
+
+    DATA_TYPE_HUB_ID
 } data_type_t;
 
 typedef struct controller_queue_info {
@@ -81,6 +92,12 @@ typedef struct controller_queue_info {
         int value_int;
         bool flag;
         commands command;
+        char c_value[64];
+
+        // struct __attribute__((packed)) {
+        //     char ssid[128];
+        //     char pw[128];
+        // } wifi;
     } data;
 
 } controller_data;

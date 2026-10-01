@@ -16,8 +16,8 @@ __pycache__/
 
 network_info.h
 
-test_webserver/node_modules
-test_webserver/keys
-test_webserver/.env
+webserver/node_modules
+webserver/keys
+webserver/.env
 
 dependencies.lock
