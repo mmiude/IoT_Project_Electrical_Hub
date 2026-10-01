@@ -139,7 +139,7 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
-    EventGroupHandle_t wifi_eg = xEventGroupCreate();
+    //EventGroupHandle_t wifi_eg = xEventGroupCreate();
     EventGroupHandle_t sys_event_bits = xEventGroupCreate(); // rename this! 
     //IPStack ipstack(wifi_eg);
     // if (have_saved_wifi) {
