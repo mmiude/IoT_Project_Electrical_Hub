@@ -7,15 +7,16 @@
 
 #include "jwt.h"
 #include "IPStack.h"
-#include "HubControllerEnums.h"
+#include "HubEnums.h"
 
 #include <vector>
 
 #include "network_info.h"
+#include "EventBits.h"
 
 // #define JSMN_STATIC
 // #include "jsmn.h"
-
+/*
 #define THINGSPEAK_CERT "-----BEGIN CERTIFICATE-----\n\
 MIIDjjCCAnagAwIBAgIQAzrx5qcRqaC7KGSxHQn65TANBgkqhkiG9w0BAQsFADBh\n\
 MQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3\n\
@@ -38,8 +39,9 @@ Fdtom/DzMNU+MeKNhJ7jitralj41E6Vf8PlwUHBHQRFXGU7Aj64GxJUTFy8bJZ91\n\
 pLiaWN0bfVKfjllDiIGknibVb63dDcY3fe0Dkhvld1927jyNxF1WW6LZZm6zNTfl\n\
 MrY=\n\
 -----END CERTIFICATE-----\n"
+*/
 
-#define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
+// #define THINGSPEACK_TB_URL "https://api.thingspeak.com/talkbacks/%d/commands/execute.json"
 
 // enum class Commands {
 //     TOGGLE_PLUG,
@@ -53,11 +55,11 @@ MrY=\n\
 //     uint64_t device_id;
 // } HubCommand;
 
-#define JSMN_TOKENS_SIZE 20
+// #define JSMN_TOKENS_SIZE 20
 #define MINUTE_TO_MS 60 * 1000
 
-#define SEND_DATA_EVENT_BIT BIT6
-#define GET_ELEC_PRICE_EVENT_BIT BIT7
+// #define SEND_DATA_EVENT_BIT BIT6
+// #define GET_ELEC_PRICE_EVENT_BIT BIT7
 
 class CloudCommunication
 {
@@ -67,11 +69,13 @@ private:
 
     // QueueHandle_t tb_command_q;
     // QueueHandle_t cloud_control_q;
-    QueueHandle_t rx_queue;
-    QueueHandle_t tx_queue;
+    // QueueHandle_t rx_queue;
+    // QueueHandle_t tx_queue;
+    QueueHandle_t cloud_q;
+    QueueHandle_t controller_q;
 
     TimerHandle_t elec_price_req_timer_h;
-    // TimerHandle_t cloud_comm_timer_h;
+    TimerHandle_t send_wifi_status_timer_h;
 
     TaskHandle_t cloud_task_handle;
 
@@ -95,7 +99,7 @@ private:
     // bool generate_hub_jwt(char *buffer, size_t size);
 
     static void elec_price_req_timer_cb(TimerHandle_t xTimer);
-    static void send_data_timer_cb(TimerHandle_t xTimer);
+    static void send_wifi_status_timer_cb(TimerHandle_t xTimer);
 
     void validate_hub();
     // void read_data();
@@ -103,6 +107,7 @@ private:
     void get_electricity_price(std::vector<float> &price_vec);
     void connect_websocket();
     void parse_websocket_data();
+    void send_wifi_status(bool online);
     
     static void cloud_task(void *param);
 
@@ -113,7 +118,9 @@ private:
 
 public:
     CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wifi_eg, 
-        QueueHandle_t _rx_queue, QueueHandle_t _tx_queue);
+        /*QueueHandle_t _rx_queue, QueueHandle_t _tx_queue*/
+        QueueHandle_t _cloud_q, QueueHandle_t _controller_q
+    );
     ~CloudCommunication();
 };
 

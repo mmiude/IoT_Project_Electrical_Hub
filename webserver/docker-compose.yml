@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    build: database
+    container_name: postgres_db
+    restart: always
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=spikestriker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: web_app
+    restart: always
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    environment:
+      - ENVIRONMENT=PROD
+      # - DATABASE_URL=postgresql://admin:admin@db:5432/spikestriker
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
