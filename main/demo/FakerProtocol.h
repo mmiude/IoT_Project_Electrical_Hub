@@ -2,23 +2,48 @@
 #define FAKERPROTOCOL_H
 
 #include "IDeviceProtocol.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "esp_check.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "HubControllerEnums.h"
+#include "DeviceInfoStorage.h"
 #include <map>
 
 typedef struct FakeDevice {
     uint64_t dev_id;
-    float base_power_w;
-    float idle_power_w; 
+    float active_power;
+    float idle_power; 
     bool is_on;
-    float energy_consumption; 
+    float total_energy_consumption; 
+    TickType_t last_energy_update; 
 } f_dev;
+
+typedef enum FakeDataType {
+    ENERGY_CONSUMPTION,
+    VOLTAGE,
+    CURRENT,
+    POWER,
+    STATE,
+} f_data_type;
+
+typedef struct FakerData {
+    f_data_type type;
+    uint64_t dev_id; 
+    union {
+        float f_value;
+        int i_value;
+        bool flag;
+    } data; 
+} f_data; 
 
 class FakerProtocol : public IDeviceProtocol {
 
 public: 
-    FakerProtocol() {  // let's see if this rembers the devices -> would work then 100% same as zigbee coordinator... -> then we would pass it's own nvs namespace 
-        init_demo_devices();
-    }
-    
+    FakerProtocol(QueueHandle_t controller_q, EventGroupHandle_t e_bits);
+        
     void request_energy_consumption_values(uint64_t device_id) override;
     void request_electrical_values(uint64_t device_id) override;
     void request_on_off_state(uint64_t device_id) override;
@@ -27,8 +52,26 @@ public:
     void set_plug_off(uint64_t device_id) override;
 
 private: 
+    static void runner(void *params);
+    void run();
+
+    QueueHandle_t controller_queue;
+    EventGroupHandle_t event_group; 
+    QueueHandle_t f_event_queue; 
+    TaskHandle_t handle; 
+
     std::map<uint64_t, f_dev> f_devices; 
     void init_demo_devices();
+
+    float get_voltage(const f_dev &dev);
+    float get_power(const f_dev &dev);
+    float get_current(const f_dev &dev);
+    float get_energy_consumption(f_dev &dev);
+
+    float get_noise(float per);
+
+    f_dev* find_dev(uint64_t id);
+ 
 };
 
 #endif //FAKERPROTOCOL_H
