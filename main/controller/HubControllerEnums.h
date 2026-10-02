@@ -75,7 +75,7 @@ typedef enum {
     DATA_TYPE_UNKNOWN,
     // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
     // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
-    DATA_TYPE_UI_SYNC_REQUEST,
+    //DATA_TYPE_UI_SYNC_REQUEST,
     DATA_TYPE_UI_SYNC_DONE
 } data_type_t;
 

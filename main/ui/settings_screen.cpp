@@ -7,6 +7,7 @@
 namespace {
 
 constexpr uint32_t CARD_BG = 0x262626;
+constexpr uint32_t SWITCH_ON_COLOR = 0x4CAF50;
 
 // sliders work in tenths of a c/kWh (into-300) should be changed maybe?
 
@@ -37,6 +38,7 @@ private:
     static void wifi_save_btn_cb(lv_event_t *e);
     static void wifi_cancel_btn_cb(lv_event_t *e);
     static void wifi_field_focused_cb(lv_event_t *e);
+    static void automation_switch_cb(lv_event_t *e);
 
     UiModel *model{};
     lv_obj_t *low_slider{};
@@ -80,6 +82,17 @@ void SettingsScreen::wifi_field_focused_cb(lv_event_t *e)
     if (!g_screen || !g_screen->popup_keyboard) return;
     auto *ta = static_cast<lv_obj_t *>(lv_event_get_target(e));
     lv_keyboard_set_textarea(g_screen->popup_keyboard, ta);
+}
+
+// bulk action (see UiModel::set_automation)
+void SettingsScreen::automation_switch_cb(lv_event_t *e)
+{
+    if (!g_screen) return;
+    auto *sw = static_cast<lv_obj_t *>(lv_event_get_target(e));
+    bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    for (const auto &entry : g_screen->model->devices()) {
+        g_screen->model->set_automation(entry.first, on);
+    }
 }
 
 // drag (does not save)
@@ -283,10 +296,6 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_obj_align(back_btn, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_add_event_cb(back_btn, back_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    // here's a possible idea for this,
-    // ssid/pass popup -> saves via UiModel::set_wifi_credentials -> hubcontroller -> nsv
-    // we need to boot up again tho...
-
     lv_obj_t *network_label = lv_label_create(scr);
     lv_label_set_text(network_label, "Network");
     lv_obj_set_style_text_color(network_label, lv_color_hex(0x999999), 0);
@@ -327,6 +336,19 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_label_set_text(threshold_label, "Price Threshold");
     lv_obj_set_style_text_color(threshold_label, lv_color_hex(0x999999), 0);
     lv_obj_align(threshold_label, LV_ALIGN_TOP_LEFT, 14, 158);
+
+    // automation toggle (bulk switch)
+    // see automation_switch_cb
+    lv_obj_t *automation_label = lv_label_create(scr);
+    lv_label_set_text(automation_label, "Automation");
+    lv_obj_set_style_text_color(automation_label, lv_color_hex(0x999999), 0);
+    lv_obj_align(automation_label, LV_ALIGN_TOP_RIGHT, -72, 156);
+
+    lv_obj_t *automation_switch = lv_switch_create(scr);
+    lv_obj_set_style_bg_color(automation_switch, lv_color_hex(SWITCH_ON_COLOR), LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_align(automation_switch, LV_ALIGN_TOP_RIGHT, -14, 147);
+    lv_obj_add_state(automation_switch, LV_STATE_CHECKED); // matches devices' own default (automation_on = true on join)
+    lv_obj_add_event_cb(automation_switch, automation_switch_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_obj_t *threshold_card = lv_obj_create(scr);
     lv_obj_set_size(threshold_card, 460, 116);

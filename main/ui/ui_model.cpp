@@ -6,8 +6,8 @@
 
 static const char *TAG = "UI_MODEL";
 
-UiModel::UiModel(QueueHandle_t controller_queue, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage)
-    : controller_queue(controller_queue), storage(storage) {}
+UiModel::UiModel(QueueHandle_t controller_queue, QueueHandle_t cloud_queue, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage)
+    : controller_queue(controller_queue), cloud_queue(cloud_queue), storage(storage) {}
 
 void UiModel::add_listener(UiModelListener *listener) {
     listeners.push_back(listener);
@@ -27,11 +27,12 @@ void UiModel::load() {
     ESP_LOGI(TAG, "restored %d named devices from nvs", (int)device_map.size());
 }
 
+/*
 void UiModel::request_sync() {
     controller_data msg = {.type = DATA_TYPE_UI_SYNC_REQUEST, .data = {}};
     send(msg);
 }
-
+*/
 void UiModel::handle_message(const controller_data &msg) {
     // device independent messages first
     switch (msg.type) {
@@ -48,9 +49,9 @@ void UiModel::handle_message(const controller_data &msg) {
             price_known = true;
             notify_price();
             return;
-        case DATA_TYPE_UI_SYNC_DONE:
-            prune_unconfirmed();
-            return;
+        // case DATA_TYPE_UI_SYNC_DONE:
+        //     prune_unconfirmed();
+        //     return;
         default:
             break;
     }
@@ -156,6 +157,13 @@ void UiModel::name_device(uint64_t id, const std::string &name, int priority) {
     dev.name = name;
     dev.pending = false;
     save_name(dev);
+
+    controller_data name_msg{};
+    name_msg.device_id = id;
+    name_msg.type = DATA_TYPE_DEVICE_NAME;
+    snprintf(name_msg.data.c_value, sizeof(name_msg.data.c_value), "%s", name.c_str());
+    send_to_cloud(name_msg);
+
     set_priority(id, priority); // also notifies listeners
 }
 
@@ -179,10 +187,15 @@ void UiModel::remove_device(uint64_t id) {
 }
 
 void UiModel::set_wifi_credentials(const std::string &ssid, const std::string &password) {
+    controller_data ssid_msg{};
+    ssid_msg.type = DATA_TYPE_WIFI_SSID;
+    snprintf(ssid_msg.data.c_value, sizeof(ssid_msg.data.c_value), "%s", ssid.c_str());
+    send_to_cloud(ssid_msg);
 
-    // still needs actual storing !!!
-    (void)ssid;
-    (void)password;
+    controller_data pw_msg{};
+    pw_msg.type = DATA_TYPE_WIFI_PW;
+    snprintf(pw_msg.data.c_value, sizeof(pw_msg.data.c_value), "%s", password.c_str());
+    send_to_cloud(pw_msg);
 }
 
 const UiDevice *UiModel::find(uint64_t id) const {
@@ -193,6 +206,14 @@ const UiDevice *UiModel::find(uint64_t id) const {
 bool UiModel::send(const controller_data &msg) {
     if (xQueueSendToBack(controller_queue, &msg, pdMS_TO_TICKS(20)) != pdPASS) {
         ESP_LOGE(TAG, "controller queue full, dropped message type %d", (int)msg.type);
+        return false;
+    }
+    return true;
+}
+
+bool UiModel::send_to_cloud(const controller_data &msg) {
+    if (xQueueSendToBack(cloud_queue, &msg, pdMS_TO_TICKS(20)) != pdPASS) {
+        ESP_LOGE(TAG, "cloud queue full, dropped message type %d", (int)msg.type);
         return false;
     }
     return true;
