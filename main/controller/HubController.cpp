@@ -121,8 +121,9 @@ void HubController::handle_zigbee_events(controller_data &data){
             .automation_on = true,
             .periodic_check_count = 0,
             .last_seen = xTaskGetTickCount(),
+            .protocol = static_cast<ProtocolIndex>(data.data.value_int),
         });
-        //ESP_LOGI(TAG, "New device received by Hub");
+        ESP_LOGI(TAG, "New device received by Hub");
         xQueueSendToBack(ui_queue, &data, 0);
         break; 
     case DATA_TYPE_DEVICE_LEFT:
@@ -273,31 +274,32 @@ void HubController::check_medium_thresholds(){
 }*/
 
 void HubController::command_handler(controller_data &data){
-    /*auto it = devices.find(data.device_id);
-    if (it == devices.end()) {
-        ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP"); 
-        // device requested is not on controllers list -> must be deleted from ui as well... should never happen but should we have this check anyways?
-    }*/
-    switch(data.data.command) {
-        case TOGGLE_PLUG:
-            plugProtocols.at(ZIGBEE)->toggle_plug(data.device_id);
-            break;
-        case PLUG_ON: 
-            plugProtocols.at(ZIGBEE)->set_plug_on(data.device_id);
-            break;
-        case PLUG_OFF:
-            plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id);
-            break; 
-        case OPEN_NETWORK:
-            plugProtocols.at(ZIGBEE)->open_network();
-            break;
-        case REMOVE_DEVICE:
-            remove_device(data.device_id);
-            break;
-        default:
-            ESP_LOGE(TAG, "Unknown command request");
-            break;
-    }
+    auto it = devices.find(data.device_id);
+    deviceInfo *dev = (it != devices.end()) ? &it->second : nullptr; 
+
+    if (dev) { // device requested is not on controllers list -> must be deleted from ui as well... should never happen but should we have this check anyways?
+        
+        switch(data.data.command) {
+            case TOGGLE_PLUG:
+                plugProtocols.at(dev->protocol)->toggle_plug(data.device_id);
+                break;
+            case PLUG_ON: 
+                plugProtocols.at(dev->protocol)->set_plug_on(data.device_id);
+                break;
+            case PLUG_OFF:
+                plugProtocols.at(dev->protocol)->set_plug_off(data.device_id);
+                break; 
+            case OPEN_NETWORK:
+                plugProtocols.at(dev->protocol)->open_network();
+                break;
+            case REMOVE_DEVICE: // delete this... or then we need to add remove to protocol interface -> deletes device from coordinator. still in z network though
+                remove_device(data.device_id);
+                break;
+            default:
+                ESP_LOGE(TAG, "Unknown command request");
+                break;
+        }
+    } else ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP"); 
 }
 
 void HubController::periodic_device_check(){
@@ -308,17 +310,20 @@ void HubController::periodic_device_check(){
     for (auto &[key, dev] : devices) {
         ++dev.periodic_check_count;
         // request electrical values.
-        plugProtocols.at(ZIGBEE)->request_electrical_values(key);
+        plugProtocols.at(dev.protocol)->request_electrical_values(key);
 
         vTaskDelay(pdMS_TO_TICKS(5)); // small delay between requests so Zigbee network won't get angry. 
 
         // request plug state if reporting is not on for some reason.
-        if (!dev.reporting_on) plugProtocols.at(ZIGBEE)->request_on_off_state(key);
+        if (!dev.reporting_on) {
+            plugProtocols.at(dev.protocol)->request_on_off_state(key); // this only for real plugs that does not support reporting. 
+            if (dev.protocol == FAKER) dev.reporting_on = true; // FAKER DATA DOS NOT SEND REPORTING SINGNAL AND THERE IS NO POINT TO ASK IT EVERY ROUND SO WE SET THIS MANUALLY HERE -> FOR DEMO PURPOSE ONLY!
+        } 
 
         // request energy consumption valuse every 5 mins
         if (dev.periodic_check_count > 20 && dev.support_energy_consumption){ 
             ESP_LOGI(TAG, "requesting energy consumption values");
-            plugProtocols.at(ZIGBEE)->request_energy_consumption_values(key);
+            plugProtocols.at(dev.protocol)->request_energy_consumption_values(key);
             dev.periodic_check_count = 0; 
         } 
         
@@ -368,7 +373,7 @@ void HubController::remove_device(uint64_t dev_id) {
     }
     devices.erase(it);
     device_info_storage->delete_device_from_memory(dev_id);
-    ESP_LOGI(TAG, "device 0x%016llx removed from hub (still joined to zigbee network).", dev_id);
+    ESP_LOGI(TAG, "device 0x%016llx removed from hub.", dev_id);
 
     controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
     xQueueSendToBack(ui_queue, &left_msg, 0);
