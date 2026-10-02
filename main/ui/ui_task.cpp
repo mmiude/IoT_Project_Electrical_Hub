@@ -7,8 +7,8 @@
 
 static const char *TAG = "UI_TASK";
 
-UiTask::UiTask(QueueHandle_t controller_queue, QueueHandle_t ui_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage)
-    : ui_queue(ui_queue), event_group(events), ui_model(controller_queue, storage) {
+UiTask::UiTask(QueueHandle_t controller_queue, QueueHandle_t cloud_queue, QueueHandle_t ui_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage)
+    : ui_queue(ui_queue), event_group(events), ui_model(controller_queue, cloud_queue, storage) {
     // stack size needs to be BIG for lvgl (16384 worked in my tests) and priority is idle + 1 since touch
     xTaskCreate(UiTask::runner, "UI_TASK", 16384, this, tskIDLE_PRIORITY + 1, &handle);
 }
@@ -25,7 +25,7 @@ void UiTask::run() {
     lvgl_port_init();
     screen_manager_init(ui_model);
 
-    ui_model.request_sync(); // controller replays thresholds, price and device states
+    //ui_model.request_sync();
 
     controller_data msg;
     while (true) {

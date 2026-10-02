@@ -51,7 +51,7 @@ public:
 
 class UiModel {
 public:
-    UiModel(QueueHandle_t controller_queue, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage);
+    UiModel(QueueHandle_t controller_queue, QueueHandle_t cloud_queue, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage);
 
     void add_listener(UiModelListener *listener);
 
@@ -80,7 +80,7 @@ public:
     // NOTE; you need to press reset pin on plugs after removing a device! doesn't remove the known device from zigbee network :(
     void remove_device(uint64_t id);
 
-    // for saving wifi credentials! no actaul function yet
+    // sends ssid + password straight to the wifi board via cloud_queue
     void set_wifi_credentials(const std::string &ssid, const std::string &password);
 
     const std::map<uint64_t, UiDevice> &devices() const { return device_map; }
@@ -92,6 +92,7 @@ public:
 
 private:
     QueueHandle_t controller_queue;
+    QueueHandle_t cloud_queue;
     std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage;
     std::vector<UiModelListener *> listeners;
 
@@ -102,6 +103,7 @@ private:
     float med_threshold{0.0f};
 
     bool send(const controller_data &msg);
+    bool send_to_cloud(const controller_data &msg);
     void save_name(const UiDevice &dev);
 
     // for cleanup

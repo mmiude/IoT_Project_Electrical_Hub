@@ -16,7 +16,7 @@
 // zigbee is ready and feeds controller messages from ui_queue into the uimodel
 class UiTask {
 public:
-    UiTask(QueueHandle_t controller_queue, QueueHandle_t ui_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage);
+    UiTask(QueueHandle_t controller_queue, QueueHandle_t cloud_queue, QueueHandle_t ui_queue, EventGroupHandle_t events, std::shared_ptr<DeviceInfoStorage<UiDeviceRecord>> storage);
 
     UiModel &model() { return ui_model; }
 
