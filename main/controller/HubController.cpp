@@ -292,7 +292,7 @@ void HubController::command_handler(controller_data &data){
             case OPEN_NETWORK:
                 plugProtocols.at(dev->protocol)->open_network();
                 break;
-            case REMOVE_DEVICE: // delete this... 
+            case REMOVE_DEVICE: // delete this... or then we need to add remove to protocol interface -> deletes device from coordinator. still in z network though
                 remove_device(data.device_id);
                 break;
             default:
@@ -315,7 +315,10 @@ void HubController::periodic_device_check(){
         vTaskDelay(pdMS_TO_TICKS(5)); // small delay between requests so Zigbee network won't get angry. 
 
         // request plug state if reporting is not on for some reason.
-        if (!dev.reporting_on) plugProtocols.at(dev.protocol)->request_on_off_state(key);
+        if (!dev.reporting_on) {
+            plugProtocols.at(dev.protocol)->request_on_off_state(key); // this only for real plugs that does not support reporting. 
+            if (dev.protocol == FAKER) dev.reporting_on = true; // FAKER DATA DOS NOT SEND REPORTING SINGNAL AND THERE IS NO POINT TO ASK IT EVERY ROUND SO WE SET THIS MANUALLY HERE -> FOR DEMO PURPOSE ONLY!
+        } 
 
         // request energy consumption valuse every 5 mins
         if (dev.periodic_check_count > 20 && dev.support_energy_consumption){ 
@@ -370,7 +373,7 @@ void HubController::remove_device(uint64_t dev_id) {
     }
     devices.erase(it);
     device_info_storage->delete_device_from_memory(dev_id);
-    ESP_LOGI(TAG, "device 0x%016llx removed from hub (still joined to zigbee network).", dev_id);
+    ESP_LOGI(TAG, "device 0x%016llx removed from hub.", dev_id);
 
     controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
     xQueueSendToBack(ui_queue, &left_msg, 0);
