@@ -50,7 +50,7 @@ void ZigbeeCoordinator::run(){
                         ESP_LOGI(TAG, "NEW DEVICE ADDED ON MAP. short: 0x%04hx, ieee: 0x%016llx", event.data.device_joining.short_addr, event.ieee_address);
                         read_electrical_measurement_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); 
                         read_energy_consumption_multipliers(event.data.device_joining.short_addr, event.data.device_joining.endpoint); 
-                        ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_JOIN, .data{}};
+                        ctrl_data = {.device_id = event.ieee_address, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = ZIGBEE}};
                         xQueueSendToBack(controller_queue, &ctrl_data, 0);
                     } 
                 } else {

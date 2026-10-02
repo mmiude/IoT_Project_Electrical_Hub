@@ -38,6 +38,7 @@
 #include "SystemHealth.h"
 #include "Uart.h"
 #include "CloudCommunicationManager.h"
+#include "FakerProtocol.h"
 
 
 #define UART_PORT_NUM      UART_NUM_0
@@ -160,18 +161,21 @@ extern "C" void app_main(void)
 
     static auto coordinatorStorage = std::make_shared<DeviceInfoStorage<smartPlugInfo>>("zb_ns", "zb_dev_info");
     static auto controllerStorage = std::make_shared<DeviceInfoStorage<deviceInfo>>("ctrl_ns", "ctrl_dev_info");
-    static auto sysConfStorage = std::make_shared<SystemConfigStorage>(); // still needed for thresholds; wifi saving is disabled above
     static auto uiStorage = std::make_shared<DeviceInfoStorage<UiDeviceRecord>>("ui_ns", "ui_dev_info");
+    static auto fakerStorage = std::make_shared<DeviceInfoStorage<f_dev>>("f_ns", "f_dev_info");
+    static auto sysConfStorage = std::make_shared<SystemConfigStorage>(); // still needed for thresholds; wifi saving is disabled above
+    
 
     static auto leds = std::make_shared<Led>(GPIO_NUM_5, GPIO_NUM_4, GPIO_NUM_3); 
 
-    //coordinatorStorage->erase_name_space();
-    //controllerStorage->erase_name_space();
-    //sysConfStorage->erase_all_system_config_info();
-    //uiStorage->erase_name_space();
+    coordinatorStorage->erase_name_space();
+    controllerStorage->erase_name_space();
+    sysConfStorage->erase_all_system_config_info();
+    uiStorage->erase_name_space();
 
     static std::vector<std::shared_ptr<IDeviceProtocol>> protocols = {
-        std::make_shared<ZigbeeCoordinator>(controllerQueue, sys_event_bits, coordinatorStorage)
+        std::make_shared<ZigbeeCoordinator>(controllerQueue, sys_event_bits, coordinatorStorage),
+        std::make_shared<FakerProtocol>(controllerQueue, sys_event_bits, fakerStorage)
     };
 
     static HubController controller(protocols, sys_event_bits, controllerQueue, cloudQueue, uiQueue, controllerStorage, sysConfStorage);
