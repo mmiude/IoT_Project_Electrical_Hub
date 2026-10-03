@@ -45,7 +45,6 @@ private:
     float threshold_low{};
     float threshold_medium{}; 
     float current_electricity_price{};
-    bool price_received{false}; // DELETE THIS! 
 
     void notify(int state) override; 
     

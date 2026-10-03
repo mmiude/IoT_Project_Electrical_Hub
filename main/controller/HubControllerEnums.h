@@ -4,6 +4,7 @@
 #include <string>
 
 #define ZIGBEE_STACK_READY BIT3
+#define WIFI_ALIVE_BIT BIT6
 
 enum ProtocolIndex {
     ZIGBEE,
@@ -22,8 +23,7 @@ typedef enum {
     PLUG_ON,
     PLUG_OFF,
     OPEN_NETWORK,
-    // hub side remove only, Zigbee still lingers
-    REMOVE_DEVICE // remove this -> no time to make it work... 
+    REMOVE_DEVICE 
 } commands;
 
 typedef struct device_info {
@@ -50,7 +50,7 @@ typedef enum {
     DATA_TYPE_SET_ON,
     DATA_TYPE_REPORTING,
     DATA_TYPE_SUPPORTS_METERING,
-    DATA_TYPE_NETWORK_OPEN,
+    DATA_TYPE_Z_NETWORK_OPEN,
     // threshold, priority and electricity price info coming from ui 
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,
@@ -64,8 +64,9 @@ typedef enum {
     // for ui to recieve online info
     DATA_TYPE_ONLINE_STATE,
     // system health information
-    DATA_TYPE_NETOWRK_ALIVE,
+    DATA_TYPE_Z_NETOWRK_ALIVE,
     DATA_TYPE_WIFI_ONLINE,
+
     DATA_TYPE_WIFI_SSID,
     DATA_TYPE_WIFI_PW,
 
@@ -73,9 +74,6 @@ typedef enum {
     DATA_TYPE_HUB_ID,
 
     DATA_TYPE_UNKNOWN,
-    // ui <-> controller state sync, ui asks once after it has started, controller replays its state to the ui
-    // (thresholds, price if known and every device: join, priority, on, online, metering) + ends with SYNC_DONE
-    //DATA_TYPE_UI_SYNC_REQUEST,
     DATA_TYPE_UI_SYNC_DONE
 } data_type_t;
 

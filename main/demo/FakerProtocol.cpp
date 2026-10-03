@@ -46,14 +46,20 @@ void FakerProtocol::runner(void *params){
 void FakerProtocol::run() {
     
     dev_storage->get_all_devices(f_devices); 
-    if (f_devices.empty()) {
-        init_demo_devices();
-        for (auto [key, dev] : f_devices) {
-            controller_data data = {.device_id = dev.dev_id, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = FAKER}};
-            xQueueSendToBack(controller_queue, &data, 0);
-            vTaskDelay(10);
+    const std::vector<uint64_t> expected_devs = {1001, 1002, 1003};
+
+    if (f_devices.size() < 3) {  // check if some of the demo devices has been erased -> send dev join data type to add them again
+        for (auto e : expected_devs) {
+            if (f_devices.find(e) == f_devices.end()) {
+                controller_data data = {.device_id = e, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = FAKER}};
+                xQueueSendToBack(controller_queue, &data, 0);
+                vTaskDelay(10);
+            }
         }
     }
+
+    init_demo_devices(); // we init all devices any way -> overwriting does not matter in this case...
+    for (auto &[key, dev] : f_devices) dev_storage->save_device(key, dev); // save all for nex time... for demo this is good enough... 
 
     f_data event{};
     controller_data ctrl_data{};
@@ -176,6 +182,16 @@ void FakerProtocol::set_plug_off(uint64_t device_id){
 
 void FakerProtocol::open_network() {
     ESP_LOGI("FAKER:", "opening network..."); 
+}
+
+void FakerProtocol::delete_device(uint64_t device_id){
+    auto dev = find_dev(device_id);
+    if (dev) {
+        f_devices.erase(device_id);
+        dev_storage->delete_device_from_memory(device_id);
+        ESP_LOGI("FAKER", "deleting device from f_dev map.");
+    } else ESP_LOGE("FAKER", "trying to delete unknown f_dev.");
+    ESP_LOGI("FAKER:", "map size: %d", f_devices.size());
 }
 
 float FakerProtocol::get_voltage(const f_dev &dev){

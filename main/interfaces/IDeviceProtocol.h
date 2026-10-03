@@ -16,7 +16,7 @@ public:
     virtual void set_plug_on(uint64_t device_id) = 0;
     virtual void set_plug_off(uint64_t device_id) = 0;
     virtual void open_network() = 0; 
-    
+    virtual void delete_device(uint64_t device_id) = 0; 
 };
 
 #endif //IDEVICEPROTOCOL_H

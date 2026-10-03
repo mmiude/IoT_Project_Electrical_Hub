@@ -23,10 +23,16 @@ void SystemHealth::run() {
 
         if (!(bits & ZIGBEE_ALIVE_BIT)) {
             ESP_LOGE("SYS_HEALTH", "zigbee dead!");
-            ctrl_data = {.device_id = 0, .type = DATA_TYPE_NETOWRK_ALIVE, .data = {.flag = false}};
+            ctrl_data = {.device_id = 0, .type = DATA_TYPE_Z_NETOWRK_ALIVE, .data = {.flag = false}};
             xQueueSendToBack(controller_queue, &ctrl_data, 0);
-        } else ESP_LOGI("SYS_HEALTH", "zigbee alive!");
+        } 
+        else if (!(bits & WIFI_ALIVE_BIT)) {
+            ESP_LOGE("SYS_HEALT", "wifi disconnected!");
+            ctrl_data = {.device_id = 0, .type = DATA_TYPE_WIFI_ONLINE, .data = {.flag = false}};
+            xQueueSendToBack(controller_queue, &ctrl_data, 0);
+        }
+        else ESP_LOGI("SYS_HEALTH", "zigbee alive!");
 
-        vTaskDelayUntil(&last_check_time, pdMS_TO_TICKS(30000));
+        vTaskDelayUntil(&last_check_time, pdMS_TO_TICKS(40000));
     }
 }
