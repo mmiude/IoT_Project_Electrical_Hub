@@ -4,6 +4,7 @@
 #include <string>
 
 #define ZIGBEE_STACK_READY BIT3
+#define WIFI_ALIVE_BIT BIT6
 
 enum ProtocolIndex {
     ZIGBEE,
@@ -50,7 +51,7 @@ typedef enum {
     DATA_TYPE_SET_ON,
     DATA_TYPE_REPORTING,
     DATA_TYPE_SUPPORTS_METERING,
-    DATA_TYPE_NETWORK_OPEN,
+    DATA_TYPE_Z_NETWORK_OPEN,
     // threshold, priority and electricity price info coming from ui 
     DATA_TYPE_THRESHOLD_LOW,
     DATA_TYPE_THRESHOLD_MED,
@@ -64,7 +65,7 @@ typedef enum {
     // for ui to recieve online info
     DATA_TYPE_ONLINE_STATE,
     // system health information
-    DATA_TYPE_NETOWRK_ALIVE,
+    DATA_TYPE_Z_NETOWRK_ALIVE,
     DATA_TYPE_WIFI_ONLINE,
     DATA_TYPE_WIFI_SSID,
     DATA_TYPE_WIFI_PW,

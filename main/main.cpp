@@ -186,7 +186,7 @@ extern "C" void app_main(void)
     static UiTask ui(controllerQueue, cloudQueue, uiQueue, sys_event_bits, uiStorage);
 
     static auto uart = std::make_shared<Uart>(UART_NUM_1, 16, 17, uart_events);
-    static CloudCommunicationManager cloud_comm(uart, controllerQueue, cloudQueue);
+    static CloudCommunicationManager cloud_comm(uart, sys_event_bits, controllerQueue, cloudQueue, uiQueue);
     //static dummy_task_params parameters = {.q = controllerQueue, .events = wifi_eg};
     //static dummy_task_params_2 params = {.q_s = controllerQueue, .q_r = uiQueue, .events = wifi_eg};
 

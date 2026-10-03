@@ -214,13 +214,13 @@ void ZigbeeCoordinator::run(){
                 break; 
             case ZIGBEE_EVENT_NETWORK_OPEN:
                 ESP_LOGI(TAG, "Network open for 3 mins");
-                ctrl_data = {.device_id = 0, .type = DATA_TYPE_NETWORK_OPEN, .data = {.flag = true}};
+                ctrl_data = {.device_id = 0, .type = DATA_TYPE_Z_NETWORK_OPEN, .data = {.flag = true}};
                 //ctrl_data.data.flag = true; 
                 xQueueSend(controller_queue, &ctrl_data, 0);
                 break;
             case ZIGBEE_EVENT_NETWORK_CLOSED:
                 ESP_LOGI(TAG, "Network close");
-                ctrl_data = {.device_id = 0, .type = DATA_TYPE_NETWORK_OPEN, .data = {.flag = false}};
+                ctrl_data = {.device_id = 0, .type = DATA_TYPE_Z_NETWORK_OPEN, .data = {.flag = false}};
                 xQueueSend(controller_queue, &ctrl_data, 0);
                 break;
             default:
@@ -294,6 +294,16 @@ void ZigbeeCoordinator::open_network(){
     esp_zigbee_lock_release();
 }
 
+void ZigbeeCoordinator::delete_device(uint64_t device_id) {
+    auto plug = find_plug(device_id);
+    if (plug) {
+        devices.erase(device_id);
+        storage->delete_device_from_memory(device_id);
+        ESP_LOGI(TAG, "device erased from map.");
+    } else ESP_LOGE(TAG, "tyring to erase unkonwn device."); 
+    ESP_LOGI(TAG, "map size: %d", devices.size());
+}
+
 int ZigbeeCoordinator::check_device_count(){ // helper to debug if needed
     for (const auto& [key, value] : devices) {
         printf("Device short_addr: 0x%04hx, key: 0x%016llx\n", value.short_addr, key); 
@@ -301,14 +311,13 @@ int ZigbeeCoordinator::check_device_count(){ // helper to debug if needed
     return devices.size(); 
 }
 
-
 // private methods 
 smartPlug* ZigbeeCoordinator::find_plug(uint64_t ieee_addr){
     auto it = devices.find(ieee_addr);  
     return (it != devices.end()) ? &it->second : nullptr; 
 }
 
-void ZigbeeCoordinator::check_devices_map() {
+void ZigbeeCoordinator::check_devices_map() { // helper to debug...
     ESP_LOGI(TAG, "*****INFO READ FROM MEMROY*****");
     for (auto &[key, dev] : devices) {
         if (dev.current_divisor == 0 || dev.current_multiplier == 0 || dev.power_divisor == 0 || dev.power_multiplier == 0 || dev.voltage_divisor == 0 || dev.voltage_multiplier == 0 || dev.summation_divisor == 0 || dev.summation_multiplier == 0) ESP_LOGW(TAG, "current div zero for plug: 0x%016llx", key);

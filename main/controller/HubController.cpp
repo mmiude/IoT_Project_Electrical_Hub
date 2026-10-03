@@ -73,10 +73,8 @@ void HubController::run(){
             case DATA_TYPE_ELEC_PRICE:
                 ESP_LOGI(TAG, "new electricity price received %.2f.", ctrl_data.data.value);
                 current_electricity_price = ctrl_data.data.value;
-                price_received = true; // DELETE! 
                 check_low_thresholds();
                 check_medium_thresholds();
-                // was missing (the ui price should update now)
                 xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
@@ -87,20 +85,16 @@ void HubController::run(){
             case DATA_TYPE_COMMAND:
                 command_handler(ctrl_data);
                 break;
-            // case DATA_TYPE_UI_SYNC_REQUEST:
-            //     send_ui_sync();
-            //     break;
-            case DATA_TYPE_NETWORK_OPEN:
+            case DATA_TYPE_Z_NETWORK_OPEN:
                 if (ctrl_data.data.flag) notify(Z_NETWORK_OPEN);
                 else notify(Z_NETWORK_CLOSE); 
                 break;
-            case DATA_TYPE_NETOWRK_ALIVE:
+            case DATA_TYPE_Z_NETOWRK_ALIVE:
                 if (ctrl_data.data.flag) notify(Z_NETWORK_UP);
                 else notify(Z_NETWORK_DOWN);
                 break;
             case DATA_TYPE_WIFI_ONLINE:
-                // notify ui (wi-fi connection lost)
-                if (!ctrl_data.data.flag) 
+                if (!ctrl_data.data.flag) xQueueSendToBack(ui_queue, &ctrl_data, 0); 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -241,46 +235,11 @@ void HubController::check_medium_thresholds(){
     }
 }
 
-/*void HubController::check_thresholds(){
-    ESP_LOGI(TAG, "checking both thresholds. elec price: %.2f, low: %.2f, med: %.2f", current_electricity_price, threshold_low, threshold_medium);
-
-    for (auto &[key, dev] : devices) {
-        if (dev.priority == 2 && dev.automation_on) {
-            if (current_electricity_price > threshold_medium) {
-                if (dev.on){
-                    plugProtocols.at(ZIGBEE)->set_plug_off(key);
-                    ESP_LOGI(TAG, "setting plug off on threshold check.");
-                } 
-            } else {
-                if (!dev.on){
-                    plugProtocols.at(ZIGBEE)->set_plug_on(key);
-                    ESP_LOGI(TAG, "setting plug on on threshold check");
-                } 
-            }
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-
-        else if (dev.priority == 1 && dev.automation_on) {
-            if (current_electricity_price > threshold_low) {
-                plugProtocols.at(ZIGBEE)->set_plug_off(key);
-                ESP_LOGI(TAG, "setting plug off on threshold check");
-                
-            } else {
-                plugProtocols.at(ZIGBEE)->set_plug_on(key);
-                ESP_LOGI(TAG, "setting plug on on threshold check");
-            }
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-
-        else ESP_LOGI(TAG, "higher priority level device then 2. Not effected by thresholds.");
-    }
-}*/
-
 void HubController::command_handler(controller_data &data){
     auto it = devices.find(data.device_id);
     deviceInfo *dev = (it != devices.end()) ? &it->second : nullptr; 
 
-    if (dev) { // device requested is not on controllers list -> must be deleted from ui as well... should never happen but should we have this check anyways?
+    if (dev) { 
         
         switch(data.data.command) {
             case TOGGLE_PLUG:
@@ -295,7 +254,8 @@ void HubController::command_handler(controller_data &data){
             case OPEN_NETWORK:
                 plugProtocols.at(dev->protocol)->open_network();
                 break;
-            case REMOVE_DEVICE: // delete this... or then we need to add remove to protocol interface -> deletes device from coordinator. still in z network though
+            case REMOVE_DEVICE: 
+                plugProtocols.at(dev->protocol)->delete_device(data.device_id);
                 remove_device(data.device_id);
                 break;
             default:
@@ -367,19 +327,13 @@ void HubController::modify_dev_automation(uint64_t dev_id, bool state) {
     } else ESP_LOGE(TAG, "dev not found! no automation flag modified.");
 }
 
-// hub side only, Zigbee still lingers 
 void HubController::remove_device(uint64_t dev_id) {
-    auto it = devices.find(dev_id);
-    if (it == devices.end()) {
-        ESP_LOGE(TAG, "remove_device: dev not found, nothing removed.");
-        return;
-    }
-    devices.erase(it);
+    devices.erase(dev_id);
     device_info_storage->delete_device_from_memory(dev_id);
-    ESP_LOGI(TAG, "device 0x%016llx removed from hub.", dev_id);
-
+    //ESP_LOGI(TAG, "device 0x%016llx removed from hub.", dev_id);
     controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
     xQueueSendToBack(ui_queue, &left_msg, 0);
+    ESP_LOGI(TAG, "map size: %d", devices.size());
 }
 
 
@@ -391,7 +345,7 @@ bool HubController::push_to_ui(controller_data &data){ // do we really need this
 }
 
 void HubController::send_ui_sync(){
-    ESP_LOGI(TAG, "ui requested sync, replaying state."); // delete
+    ESP_LOGI(TAG, "sending sync"); 
     bool ok = true; 
     controller_data msg{};
 
@@ -399,22 +353,22 @@ void HubController::send_ui_sync(){
     ok &= push_to_ui(msg);
     msg = {.type = DATA_TYPE_THRESHOLD_MED, .data = {.value = threshold_medium}};
     ok &= push_to_ui(msg);
-    if (price_received) { // not this if cloud anyways sends this after boot -> comes naturally to controller and ui 
+    /*if (price_received) { // not this if cloud anyways sends this after boot -> comes naturally to controller and ui 
         msg = {.type = DATA_TYPE_ELEC_PRICE, .data = {.value = current_electricity_price}};
         ok &= push_to_ui(msg);
-    }
+    }*/
 
     for (auto &[key, dev] : devices) {
-        msg = {.device_id = key, .type = DATA_TYPE_DEVICE_JOIN, .data = {}};
-        ok &= push_to_ui(msg);
+        //msg = {.device_id = key, .type = DATA_TYPE_DEVICE_JOIN, .data = {}};
+        //ok &= push_to_ui(msg);
         msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}}; // we could send only this -> so one message per dev in sync and set confirmed true under priority data type in ui model.cpp
         ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}}; // controller has no uptodate info regarding this
-        ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}}; // sames as above
-        ok &= push_to_ui(msg);
-        msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
-        ok &= push_to_ui(msg);
+        //msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}}; // controller has no uptodate info regarding this
+        //ok &= push_to_ui(msg);
+        //msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}}; // sames as above
+        //ok &= push_to_ui(msg);
+        //msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
+        //ok &= push_to_ui(msg);
     }
 
     //  ui removes devices it knows about but are missing from the replay, so only say done if nothing got dropped
