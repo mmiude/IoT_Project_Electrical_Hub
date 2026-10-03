@@ -6,7 +6,7 @@ static const char *TAG = "HUB_CONTROLLER";
 
 HubController::HubController(const std::vector<std::shared_ptr<IDeviceProtocol>> &protocols, EventGroupHandle_t events, QueueHandle_t controller_q, QueueHandle_t cloud_q, QueueHandle_t ui_q, std::shared_ptr<DeviceInfoStorage<deviceInfo>> dev_stroage, std::shared_ptr<SystemConfigStorage> config_storage) : 
 plugProtocols(protocols), event_group(events), controller_queue(controller_q), cloud_queue(cloud_q), ui_queue(ui_q), device_info_storage(dev_stroage), system_config_storage(config_storage) {
-    timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(15000), pdTRUE, this, dataRequestTimerCallback);
+    timer_handle = xTimerCreate("DATA_REQ_TIMER", pdMS_TO_TICKS(30000), pdTRUE, this, dataRequestTimerCallback);
     xTaskCreate(HubController::runner, "HUB_CONTROLLER", 2048, this, tskIDLE_PRIORITY + 2, &handle);
 }
 
@@ -42,6 +42,7 @@ void HubController::run(){
     system_config_storage->get_threshold_levels(threshold_low, threshold_medium); // if there is no values saved these returns zeros 
     ESP_LOGW(TAG, "read following values low: %f, med: %f", threshold_low, threshold_medium);
     // here we can send sync to ui -> ui don't need to ask sync separately... 
+    send_ui_sync(); 
     
     while (true) {
 
@@ -77,7 +78,7 @@ void HubController::run(){
                 check_medium_thresholds();
                 xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
-            case DATA_TYPE_REQUEST_ELEC_VALUES: // this comes every 15sec 
+            case DATA_TYPE_REQUEST_ELEC_VALUES: 
                 ESP_LOGI(TAG, "requesting electrical values.");
                 periodic_device_check();
                 printf("map sizes: controller: %d\n", devices.size());
@@ -111,9 +112,9 @@ void HubController::handle_zigbee_events(controller_data &data){
 
     switch(data.type)
     {
-    case DATA_TYPE_DEVICE_JOIN: // check here the protocol -> add device info 
+    case DATA_TYPE_DEVICE_JOIN: 
         devices.emplace(data.device_id, deviceInfo{
-            .priority = 0, // this will be taken off - why?
+            .priority = 0, 
             .online = true,
             .automation_on = true,
             .periodic_check_count = 0,
@@ -165,8 +166,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->on = data.data.flag;
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
-            if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(ZIGBEE)->set_plug_off(data.device_id); 
-            //if (dev->on) plugProtocols.at(ZIGBEE)->request_electrical_values(data.device_id);
+            if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(dev->protocol)->set_plug_off(data.device_id); 
             xQueueSendToBack(ui_queue, &data, 0);
             xQueueSendToBack(cloud_queue, &data, 0);
         }  
@@ -215,9 +215,9 @@ void HubController::check_low_thresholds(){
     ESP_LOGI(TAG, "checking low threshold");
     for (auto &dev : devices | std::views::filter([] (const auto &dev) {return dev.second.priority == 1 && dev.second.automation_on;})) {
         if (current_electricity_price > threshold_low) {
-            plugProtocols.at(ZIGBEE)->set_plug_off(dev.first);
+            plugProtocols.at(dev.second.protocol)->set_plug_off(dev.first);
         } else {
-            plugProtocols.at(ZIGBEE)->set_plug_on(dev.first);
+            plugProtocols.at(dev.second.protocol)->set_plug_on(dev.first);
         }
         vTaskDelay(pdMS_TO_TICKS(10));  
     }
@@ -227,9 +227,9 @@ void HubController::check_medium_thresholds(){
     ESP_LOGI(TAG, "checking med threshold");
     for (auto &dev : devices | std::views::filter([] (const auto &dev) {return dev.second.priority == 2 && dev.second.automation_on;})) {
         if (current_electricity_price > threshold_medium) {
-            plugProtocols.at(ZIGBEE)->set_plug_off(dev.first);
+            plugProtocols.at(dev.second.protocol)->set_plug_off(dev.first);
         } else {
-            plugProtocols.at(ZIGBEE)->set_plug_on(dev.first);
+            plugProtocols.at(dev.second.protocol)->set_plug_on(dev.first);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -341,7 +341,7 @@ void HubController::remove_device(uint64_t dev_id) {
 
 // short timeout 
 bool HubController::push_to_ui(controller_data &data){ // do we really need this? 
-    return xQueueSendToBack(ui_queue, &data, pdMS_TO_TICKS(50)) == pdPASS;
+    return xQueueSendToBack(ui_queue, &data, pdMS_TO_TICKS(20)) == pdPASS;
 }
 
 void HubController::send_ui_sync(){
@@ -353,25 +353,14 @@ void HubController::send_ui_sync(){
     ok &= push_to_ui(msg);
     msg = {.type = DATA_TYPE_THRESHOLD_MED, .data = {.value = threshold_medium}};
     ok &= push_to_ui(msg);
-    /*if (price_received) { // not this if cloud anyways sends this after boot -> comes naturally to controller and ui 
-        msg = {.type = DATA_TYPE_ELEC_PRICE, .data = {.value = current_electricity_price}};
-        ok &= push_to_ui(msg);
-    }*/
 
     for (auto &[key, dev] : devices) {
-        //msg = {.device_id = key, .type = DATA_TYPE_DEVICE_JOIN, .data = {}};
-        //ok &= push_to_ui(msg);
         msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}}; // we could send only this -> so one message per dev in sync and set confirmed true under priority data type in ui model.cpp
         ok &= push_to_ui(msg);
-        //msg = {.device_id = key, .type = DATA_TYPE_SET_ON, .data = {.flag = dev.on}}; // controller has no uptodate info regarding this
-        //ok &= push_to_ui(msg);
-        //msg = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = dev.online}}; // sames as above
-        //ok &= push_to_ui(msg);
         //msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
         //ok &= push_to_ui(msg);
     }
 
-    //  ui removes devices it knows about but are missing from the replay, so only say done if nothing got dropped
     if (ok) {
         msg = {.type = DATA_TYPE_UI_SYNC_DONE, .data = {}};
         push_to_ui(msg);
