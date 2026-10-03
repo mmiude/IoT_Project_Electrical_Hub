@@ -52,6 +52,7 @@ public:
     void set_plug_on(uint64_t device_id) override;
     void set_plug_off(uint64_t device_id) override;
     void open_network() override;
+    void delete_device(uint64_t device_id) override; 
 
 private: 
     static void runner(void *params);

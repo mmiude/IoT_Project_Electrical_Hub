@@ -12,7 +12,7 @@
 
 class CloudCommunicationManager {
 public:
-    CloudCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t controller_queue, QueueHandle_t cloud_queue);
+    CloudCommunicationManager(std::shared_ptr<Uart> uart, EventGroupHandle_t bits, QueueHandle_t controller_queue, QueueHandle_t cloud_queue, QueueHandle_t ui_queue);
 
 private: 
     static void runner_tx(void *params);
@@ -25,8 +25,10 @@ private:
 
     std::shared_ptr<Uart> uart;
 
+    EventGroupHandle_t event_bits;
     QueueHandle_t controller_q;
     QueueHandle_t cloud_q; 
+    QueueHandle_t ui_q;
     QueueHandle_t event_q;
 
     TaskHandle_t tx_handle;
