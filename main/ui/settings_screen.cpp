@@ -20,6 +20,7 @@ public:
 
 private:
     void on_thresholds_changed(float low, float med) override;
+    void on_hub_id_changed(const std::string &hub_id) override;
 
     lv_obj_t *build_slider_block(lv_obj_t *parent, const char *title, uint32_t color, lv_obj_t **out_value_label,
                                   lv_event_cb_t changed_cb, lv_event_cb_t released_cb);
@@ -46,6 +47,7 @@ private:
     lv_obj_t *med_slider{};
     lv_obj_t *med_value_label{};
     lv_obj_t *wifi_text{};
+    lv_obj_t *hub_id_label{};
 
     // wifi popup, only one open at a time, same type as device management's edit popup
     lv_obj_t *popup_overlay{};
@@ -183,6 +185,13 @@ void SettingsScreen::on_thresholds_changed(float low, float med)
     refresh_value_label(low_value_label, low);
     lv_slider_set_value(med_slider, (int32_t)(med * 10.0f), LV_ANIM_OFF);
     refresh_value_label(med_value_label, med);
+}
+
+void SettingsScreen::on_hub_id_changed(const std::string &hub_id)
+{
+    char buf[48];
+    snprintf(buf, sizeof(buf), "Hub ID: %s", hub_id.c_str());
+    lv_label_set_text(hub_id_label, buf);
 }
 
 void SettingsScreen::open_wifi_popup()
@@ -327,9 +336,22 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_label_set_text(wifi_icon, LV_SYMBOL_WIFI);
     lv_obj_set_style_text_color(wifi_icon, lv_color_hex(0xFFFFFF), 0);
 
-    wifi_text = lv_label_create(network_row);
+    lv_obj_t *network_text_col = lv_obj_create(network_row);
+    lv_obj_set_size(network_text_col, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(network_text_col, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(network_text_col, 0, 0);
+    lv_obj_set_style_pad_all(network_text_col, 0, 0);
+    lv_obj_clear_flag(network_text_col, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(network_text_col, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_flex_flow(network_text_col, LV_FLEX_FLOW_COLUMN);
+
+    wifi_text = lv_label_create(network_text_col);
     lv_label_set_text(wifi_text, "Wi-Fi - tap to set up");
     lv_obj_set_style_text_color(wifi_text, lv_color_hex(0x999999), 0);
+
+    hub_id_label = lv_label_create(network_text_col);
+    lv_label_set_text(hub_id_label, "Hub ID: pending...");
+    lv_obj_set_style_text_color(hub_id_label, lv_color_hex(0x666666), 0);
 
     // ---- Price threshold section ---
     lv_obj_t *threshold_label = lv_label_create(scr);
@@ -367,6 +389,7 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
                                      med_slider_changed_cb, med_slider_released_cb);
 
     on_thresholds_changed(model->threshold_low(), model->threshold_medium());
+    if (model->has_hub_id()) on_hub_id_changed(model->hub_id());
 
     model->add_listener(this);
     return scr;

@@ -49,6 +49,11 @@ void UiModel::handle_message(const controller_data &msg) {
             price_known = true;
             notify_price();
             return;
+        case DATA_TYPE_HUB_ID:
+            hub_id_value = msg.data.c_value;
+            hub_id_known = true;
+            notify_hub_id();
+            return;
         // case DATA_TYPE_UI_SYNC_DONE:
         //     prune_unconfirmed();
         //     return;
@@ -258,4 +263,8 @@ void UiModel::notify_price() {
 
 void UiModel::notify_thresholds() {
     for (auto *l : listeners) l->on_thresholds_changed(low_threshold, med_threshold);
+}
+
+void UiModel::notify_hub_id() {
+    for (auto *l : listeners) l->on_hub_id_changed(hub_id_value);
 }
