@@ -35,10 +35,10 @@ lv_obj_t *create_screen_with_header(const char *title, const char *subtitle, lv_
     return scr;
 }
 
-lv_obj_t *create_icon_button(lv_obj_t *parent, const char *symbol, uint32_t bg_color)
+lv_obj_t *create_icon_button(lv_obj_t *parent, const char *symbol, uint32_t bg_color, int32_t size)
 {
     lv_obj_t *btn = lv_button_create(parent);
-    lv_obj_set_size(btn, 34, 34);
+    lv_obj_set_size(btn, size, size);
     lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(btn, lv_color_hex(bg_color), 0);
 
