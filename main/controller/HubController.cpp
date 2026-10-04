@@ -55,18 +55,27 @@ void HubController::run(){
                 check_low_thresholds();
                 system_config_storage->save_low_threshold(ctrl_data.data.value);
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
+                // website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_THRESHOLD_MED:
-                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value); 
+                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value);
                 threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
                 system_config_storage->save_med_threshold(ctrl_data.data.value);
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
-                break; 
-            case DATA_TYPE_PRIORITY: 
+                //website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
+                break;
+            case DATA_TYPE_PRIORITY:
                 modify_dev_priority(ctrl_data.device_id, ctrl_data.data.value_int);
-                ESP_LOGI(TAG, "new device priority recieved"); 
+                ESP_LOGI(TAG, "new device priority recieved");
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
+                // website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
+                break;
+            case DATA_TYPE_DEVICE_NAME:
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_AUTOMATION:
                 modify_dev_automation(ctrl_data.device_id, ctrl_data.data.flag);
@@ -238,7 +247,7 @@ void HubController::check_medium_thresholds(){
 void HubController::command_handler(controller_data &data){
     if (data.data.command == OPEN_NETWORK) {
         // ui needs this to start the 3 min window again (we otherwise get "E (11098) HUB_CONTROLLER: DEVICE NOT ON CONTROLLER MAP")
-        plugProtocols.at(ZIGBEE)->open_network();
+        for (auto protocol : plugProtocols) protocol->open_network();
         return;
     }
 
