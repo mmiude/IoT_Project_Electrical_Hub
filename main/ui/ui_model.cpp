@@ -122,6 +122,12 @@ void UiModel::handle_message(const controller_data &msg) {
             dev.priority = msg.data.value_int;
             dev.confirmed = true; // (replays priority per device)
             break;
+        case DATA_TYPE_DEVICE_NAME:
+            // renamed from the website, just apply + save, don't send back to cloud (would bounce right back)
+            dev.name = msg.data.c_value;
+            dev.pending = false;
+            save_name(dev);
+            break;
         default:
             ESP_LOGI(TAG, "dev 0x%016llx: unhandled type %d", msg.device_id, (int)msg.type);
             return;
