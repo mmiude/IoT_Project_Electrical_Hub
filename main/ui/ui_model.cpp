@@ -54,9 +54,9 @@ void UiModel::handle_message(const controller_data &msg) {
             hub_id_known = true;
             notify_hub_id();
             return;
-        // case DATA_TYPE_UI_SYNC_DONE:
-        //     prune_unconfirmed();
-        //     return;
+        case DATA_TYPE_UI_SYNC_DONE:
+            prune_unconfirmed();
+            return;
         default:
             break;
     }
@@ -115,6 +115,7 @@ void UiModel::handle_message(const controller_data &msg) {
             break;
         case DATA_TYPE_PRIORITY:
             dev.priority = msg.data.value_int;
+            dev.confirmed = true; // (replays priority per device)
             break;
         default:
             ESP_LOGI(TAG, "dev 0x%016llx: unhandled type %d", msg.device_id, (int)msg.type);
