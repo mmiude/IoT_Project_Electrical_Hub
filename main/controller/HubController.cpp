@@ -236,25 +236,28 @@ void HubController::check_medium_thresholds(){
 }
 
 void HubController::command_handler(controller_data &data){
+    if (data.data.command == OPEN_NETWORK) {
+        // ui needs this to start the 3 min window again (we otherwise get "E (11098) HUB_CONTROLLER: DEVICE NOT ON CONTROLLER MAP")
+        plugProtocols.at(ZIGBEE)->open_network();
+        return;
+    }
+
     auto it = devices.find(data.device_id);
     deviceInfo *dev = (it != devices.end()) ? &it->second : nullptr; 
 
-    if (dev) { 
-        
+    if (dev) {
+
         switch(data.data.command) {
             case TOGGLE_PLUG:
                 plugProtocols.at(dev->protocol)->toggle_plug(data.device_id);
                 break;
-            case PLUG_ON: 
+            case PLUG_ON:
                 plugProtocols.at(dev->protocol)->set_plug_on(data.device_id);
                 break;
             case PLUG_OFF:
                 plugProtocols.at(dev->protocol)->set_plug_off(data.device_id);
-                break; 
-            case OPEN_NETWORK:
-                plugProtocols.at(dev->protocol)->open_network();
                 break;
-            case REMOVE_DEVICE: 
+            case REMOVE_DEVICE:
                 plugProtocols.at(dev->protocol)->delete_device(data.device_id);
                 remove_device(data.device_id);
                 break;
@@ -262,7 +265,7 @@ void HubController::command_handler(controller_data &data){
                 ESP_LOGE(TAG, "Unknown command request");
                 break;
         }
-    } else ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP"); 
+    } else ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP");
 }
 
 void HubController::periodic_device_check(){
