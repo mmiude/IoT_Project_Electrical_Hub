@@ -298,11 +298,11 @@ lv_obj_t *HomeScreen::build(UiModel &m)
     build_threshold_chip(top_bar, 112, 130);
     build_chip(top_bar, 250, 104, "Usage", USAGE_COLOR, &usage_value);
 
-    lv_obj_t *add_btn = create_icon_button(top_bar, LV_SYMBOL_PLUS, 0x333333);
-    lv_obj_align(add_btn, LV_ALIGN_RIGHT_MID, -44, 0);
+    lv_obj_t *add_btn = create_icon_button(top_bar, LV_SYMBOL_PLUS, 0x333333, 40);
+    lv_obj_align(add_btn, LV_ALIGN_RIGHT_MID, -50, 0);
     lv_obj_add_event_cb(add_btn, add_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *settings_btn = create_icon_button(top_bar, LV_SYMBOL_SETTINGS, 0x333333);
+    lv_obj_t *settings_btn = create_icon_button(top_bar, LV_SYMBOL_SETTINGS, 0x333333, 40);
     lv_obj_align(settings_btn, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_add_event_cb(settings_btn, settings_btn_cb, LV_EVENT_CLICKED, NULL);
 
