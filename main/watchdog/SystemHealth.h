@@ -21,6 +21,8 @@ private:
     QueueHandle_t controller_queue; 
     TaskHandle_t task_handle; 
 
+    bool zigbee_state;
+    bool wifi_state;
 };
 
 #endif //SYSTEMHEALTH_H
