@@ -126,7 +126,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             .priority = 0, 
             .online = true,
             .automation_on = true,
-            .periodic_check_count = 0,
+            .periodic_check_count = 20,
             .last_seen = xTaskGetTickCount(),
             .protocol = static_cast<ProtocolIndex>(data.data.value_int),
         });
@@ -159,14 +159,14 @@ void HubController::handle_zigbee_events(controller_data &data){
     case DATA_TYPE_CURRENT:
         if (dev != nullptr) {
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "Current update %.2f", data.data.value);
+            //ESP_LOGI(TAG, "Current update %.2f", data.data.value);
             xQueueSendToBack(cloud_queue, &data, 0);
         } 
         break;
     case DATA_TYPE_VOLTAGE:
         if (dev != nullptr) {
             dev->last_seen = xTaskGetTickCount();
-            ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
+            //ESP_LOGI(TAG, "voltage update %.2f", data.data.value);
             xQueueSendToBack(cloud_queue, &data, 0);
         }  
         break;
@@ -285,8 +285,8 @@ void HubController::periodic_device_check(){
     for (auto &[key, dev] : devices) {
         ++dev.periodic_check_count;
         // request electrical values.
-        plugProtocols.at(dev.protocol)->request_electrical_values(key);
-
+        plugProtocols.at(dev.protocol)->request_electrical_values(key); // reqeust these from all to get the latest values and to see that plugs are responsive. 
+        
         vTaskDelay(pdMS_TO_TICKS(5)); // small delay between requests so Zigbee network won't get angry. 
 
         // request plug state if reporting is not on for some reason.
@@ -295,7 +295,7 @@ void HubController::periodic_device_check(){
             if (dev.protocol == FAKER) dev.reporting_on = true; // FAKER DATA DOS NOT SEND REPORTING SINGNAL AND THERE IS NO POINT TO ASK IT EVERY ROUND SO WE SET THIS MANUALLY HERE -> FOR DEMO PURPOSE ONLY!
         } 
 
-        // request energy consumption valuse every 5 mins
+        // request energy consumption valuse every 10 mins
         if (dev.periodic_check_count > 20 && dev.support_energy_consumption){ 
             ESP_LOGI(TAG, "requesting energy consumption values");
             plugProtocols.at(dev.protocol)->request_energy_consumption_values(key);
@@ -303,7 +303,7 @@ void HubController::periodic_device_check(){
         } 
         
         // aliveness check
-        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
+        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time >= 30000) { 
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             if (dev.online) {
                 ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = false}}; // we send to ui only if state has changed
