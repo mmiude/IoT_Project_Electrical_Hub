@@ -21,6 +21,7 @@ public:
 private:
     void on_thresholds_changed(float low, float med) override;
     void on_hub_id_changed(const std::string &hub_id) override;
+    void on_wifi_online_changed(bool online) override;
 
     lv_obj_t *build_slider_block(lv_obj_t *parent, const char *title, uint32_t color, lv_obj_t **out_value_label,
                                   lv_event_cb_t changed_cb, lv_event_cb_t released_cb);
@@ -48,6 +49,7 @@ private:
     lv_obj_t *med_value_label{};
     lv_obj_t *wifi_text{};
     lv_obj_t *hub_id_label{};
+    lv_obj_t *status_dot{};
 
     // wifi popup, only one open at a time, same type as device management's edit popup
     lv_obj_t *popup_overlay{};
@@ -194,6 +196,11 @@ void SettingsScreen::on_hub_id_changed(const std::string &hub_id)
     lv_label_set_text(hub_id_label, buf);
 }
 
+void SettingsScreen::on_wifi_online_changed(bool online)
+{
+    lv_obj_set_style_bg_color(status_dot, lv_color_hex(online ? SWITCH_ON_COLOR : 0xE53935), 0);
+}
+
 void SettingsScreen::open_wifi_popup()
 {
     if (popup_overlay) close_wifi_popup();
@@ -323,8 +330,8 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_obj_set_style_pad_column(network_row, 10, 0);
     lv_obj_add_event_cb(network_row, network_row_cb, LV_EVENT_CLICKED, NULL);
 
-    // grey dot -> unknown/not-wired status, not "known offline"
-    lv_obj_t *status_dot = lv_obj_create(network_row);
+    // grey dot until the first wifi status arrives, then green/red
+    status_dot = lv_obj_create(network_row);
     lv_obj_set_size(status_dot, 10, 10);
     lv_obj_set_style_radius(status_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(status_dot, lv_color_hex(0x666666), 0);
@@ -390,6 +397,7 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
 
     on_thresholds_changed(model->threshold_low(), model->threshold_medium());
     if (model->has_hub_id()) on_hub_id_changed(model->hub_id());
+    if (model->has_wifi_status()) on_wifi_online_changed(model->wifi_online());
 
     model->add_listener(this);
     return scr;

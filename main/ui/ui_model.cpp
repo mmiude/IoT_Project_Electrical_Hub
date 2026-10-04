@@ -54,6 +54,11 @@ void UiModel::handle_message(const controller_data &msg) {
             hub_id_known = true;
             notify_hub_id();
             return;
+        case DATA_TYPE_WIFI_ONLINE:
+            wifi_online_value = msg.data.flag;
+            wifi_online_known = true;
+            notify_wifi_online();
+            return;
         case DATA_TYPE_UI_SYNC_DONE:
             prune_unconfirmed();
             return;
@@ -268,4 +273,8 @@ void UiModel::notify_thresholds() {
 
 void UiModel::notify_hub_id() {
     for (auto *l : listeners) l->on_hub_id_changed(hub_id_value);
+}
+
+void UiModel::notify_wifi_online() {
+    for (auto *l : listeners) l->on_wifi_online_changed(wifi_online_value);
 }
