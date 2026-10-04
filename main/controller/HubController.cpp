@@ -117,7 +117,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             .priority = 0, 
             .online = true,
             .automation_on = true,
-            .periodic_check_count = 0,
+            .periodic_check_count = 20,
             .last_seen = xTaskGetTickCount(),
             .protocol = static_cast<ProtocolIndex>(data.data.value_int),
         });
@@ -283,7 +283,7 @@ void HubController::periodic_device_check(){
             if (dev.protocol == FAKER) dev.reporting_on = true; // FAKER DATA DOS NOT SEND REPORTING SINGNAL AND THERE IS NO POINT TO ASK IT EVERY ROUND SO WE SET THIS MANUALLY HERE -> FOR DEMO PURPOSE ONLY!
         } 
 
-        // request energy consumption valuse every 5 mins
+        // request energy consumption valuse every 10 mins
         if (dev.periodic_check_count > 20 && dev.support_energy_consumption){ 
             ESP_LOGI(TAG, "requesting energy consumption values");
             plugProtocols.at(dev.protocol)->request_energy_consumption_values(key);
@@ -291,7 +291,7 @@ void HubController::periodic_device_check(){
         } 
         
         // aliveness check
-        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 30000) {
+        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 40000) {
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             if (dev.online) {
                 ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = false}}; // we send to ui only if state has changed
