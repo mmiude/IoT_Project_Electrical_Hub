@@ -42,6 +42,10 @@ void Led::update(int state) {
             set_red(1);
             set_green(0);
             break;
+        case Z_NETWORK_UP:
+            set_red(0);
+            set_green(1);
+            break;
         default:
             ESP_LOGE("LEDS", "unkown update state.");
             break; 

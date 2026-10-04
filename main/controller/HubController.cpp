@@ -167,6 +167,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
             if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(dev->protocol)->set_plug_off(data.device_id); 
+            if (!data.data.flag) plugProtocols.at(dev->protocol)->request_electrical_values(data.device_id); // request electrical values only once when device is turned off...
             xQueueSendToBack(ui_queue, &data, 0);
             xQueueSendToBack(cloud_queue, &data, 0);
         }  
@@ -236,6 +237,7 @@ void HubController::check_medium_thresholds(){
 }
 
 void HubController::command_handler(controller_data &data){
+
     auto it = devices.find(data.device_id);
     deviceInfo *dev = (it != devices.end()) ? &it->second : nullptr; 
 
@@ -273,8 +275,8 @@ void HubController::periodic_device_check(){
     for (auto &[key, dev] : devices) {
         ++dev.periodic_check_count;
         // request electrical values.
-        plugProtocols.at(dev.protocol)->request_electrical_values(key);
-
+        if (dev.on) plugProtocols.at(dev.protocol)->request_electrical_values(key); // let's request only from devices that are on...
+        
         vTaskDelay(pdMS_TO_TICKS(5)); // small delay between requests so Zigbee network won't get angry. 
 
         // request plug state if reporting is not on for some reason.
@@ -291,7 +293,7 @@ void HubController::periodic_device_check(){
         } 
         
         // aliveness check
-        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time > 40000) {
+        if (uint32_t elapsed_time = ((xTaskGetTickCount() - dev.last_seen) * portTICK_PERIOD_MS) ; elapsed_time >= 30000 && dev.on) { // needs to be tested! 
             ESP_LOGE(TAG, "Device: 0x%016llx is dead! Last seen %d ms ago", key, elapsed_time);
             if (dev.online) {
                 ctrl_data = {.device_id = key, .type = DATA_TYPE_ONLINE_STATE, .data = {.flag = false}}; // we send to ui only if state has changed
