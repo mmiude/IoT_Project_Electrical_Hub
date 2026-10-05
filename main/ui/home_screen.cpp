@@ -197,12 +197,12 @@ void HomeScreen::build_row(uint64_t id, const UiDevice &dev)
 void HomeScreen::apply_row(DeviceRow &row, const UiDevice &dev)
 {
     lv_label_set_text(row.name_label, dev.name.c_str());
-    lv_label_set_text(row.priority_label_obj, dev.pending ? "Tap to '+' set up" : priority_label(dev.priority));
+    if (!dev.online) lv_label_set_text(row.priority_label_obj, "Disconnected");
+    else lv_label_set_text(row.priority_label_obj, dev.pending ? "Tap to '+' set up" : priority_label(dev.priority));
 
     if (dev.on) lv_obj_add_state(row.sw, LV_STATE_CHECKED);
     else lv_obj_clear_state(row.sw, LV_STATE_CHECKED);
 
-    // offline devices should just dim for now!
     lv_obj_set_style_opa(row.container, dev.online ? LV_OPA_COVER : LV_OPA_50, 0);
 }
 
