@@ -192,8 +192,8 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wi
 
     elec_price_req_timer_h = xTimerCreate("ELEC_PRICE_REQ", pdMS_TO_TICKS(15 * MINUTE_TO_MS), pdTRUE,
         static_cast<void*>(this), elec_price_req_timer_cb);
-    send_wifi_status_timer_h = xTimerCreate("SEND_WIFI_STATUS", pdMS_TO_TICKS(30 * 1000), pdTRUE,
-        static_cast<void*>(this), send_wifi_status_timer_cb);
+    send_wifi_board_info_timer_h = xTimerCreate("SEND_WIFI_STATUS", pdMS_TO_TICKS(30 * 1000), pdTRUE,
+        static_cast<void*>(this), send_wifi_board_info_timer_cb);
 
     xTaskCreate(cloud_task, "CLOUD_TASK", 4096, static_cast<void*>(this),
         tskIDLE_PRIORITY + 2, &cloud_task_handle);
@@ -201,7 +201,7 @@ CloudCommunication::CloudCommunication(IPStack *_ipstack, EventGroupHandle_t _wi
 
 CloudCommunication::~CloudCommunication() {
     if (elec_price_req_timer_h) xTimerDelete(elec_price_req_timer_h, portMAX_DELAY);
-    if (send_wifi_status_timer_h) xTimerDelete(send_wifi_status_timer_h, portMAX_DELAY);
+    if (send_wifi_board_info_timer_h) xTimerDelete(send_wifi_board_info_timer_h, portMAX_DELAY);
     if (cloud_task_handle) vTaskDelete(cloud_task_handle);
 }
 
@@ -210,11 +210,12 @@ void CloudCommunication::elec_price_req_timer_cb(TimerHandle_t xTimer)
     auto cloud_communication = static_cast<CloudCommunication*>(pvTimerGetTimerID(xTimer));
     xEventGroupSetBits(cloud_communication->wifi_eg, GET_ELEC_PRICE_EVENT_BIT);
 }
-void CloudCommunication::send_wifi_status_timer_cb(TimerHandle_t xTimer)
+void CloudCommunication::send_wifi_board_info_timer_cb(TimerHandle_t xTimer)
 {
     auto cloud_communication = static_cast<CloudCommunication*>(pvTimerGetTimerID(xTimer));
     EventBits_t wifi_bits = cloud_communication->ipstack->get_wifi_bits(pdMS_TO_TICKS(500));
     cloud_communication->send_wifi_status(wifi_bits & WIFI_CONNECTED_BIT);
+    cloud_communication->send_hub_id();
 }
 
 void CloudCommunication::cloud_task(void *param)
@@ -225,7 +226,7 @@ void CloudCommunication::cloud_task(void *param)
     auto ipstack = cloud_communication->ipstack;
 
     xTimerStart(cloud_communication->elec_price_req_timer_h, 0);
-    xTimerStart(cloud_communication->send_wifi_status_timer_h, 0);
+    xTimerStart(cloud_communication->send_wifi_board_info_timer_h, 0);
 
     std::vector<float> price_vec;
     while (true) {
@@ -286,14 +287,15 @@ void CloudCommunication::validate_hub()
         ESP_LOGI(TAG, "Go to: http://%s:%d/register_hub\nAnd enter code: %s\nTo register hub.",
             API_HOSTNAME, API_PORT, efuse_mac);
 
-        controller_data ctrl_data = {
-            .device_id = 0,
-            .type = DATA_TYPE_HUB_ID
-        };
-        snprintf(ctrl_data.data.c_value, sizeof(ctrl_data.data.c_value), "%s", efuse_mac);
-        if (xQueueSendToBack(controller_q, &ctrl_data, 0) == pdTRUE) {
-            ESP_LOGI(TAG, "Hub id send to HubCommunication");
-        }
+        send_hub_id();
+        // controller_data ctrl_data = {
+        //     .device_id = 0,
+        //     .type = DATA_TYPE_HUB_ID
+        // };
+        // snprintf(ctrl_data.data.c_value, sizeof(ctrl_data.data.c_value), "%s", efuse_mac);
+        // if (xQueueSendToBack(controller_q, &ctrl_data, 0) == pdTRUE) {
+        //     ESP_LOGI(TAG, "Hub id send to HubCommunication");
+        // }
     } else {
         ESP_LOGI(TAG, "Error :(");
     }
@@ -330,13 +332,41 @@ void CloudCommunication::send_data()
 
         std::ostringstream send_http_body_ss;
         send_http_body_ss << "device_id=" << ctrl_data.device_id
-                    << "&type=" << data_type_str.value()
-                    << "&value=" << ctrl_data.data.value
-                    << "&value_int=" << ctrl_data.data.value_int
-                    << "&flag=" << ctrl_data.data.flag
-                    << "&command=" << command_str
-                    << "&c_value=" << ctrl_data.data.c_value;
+                    << "&type=" << data_type_str.value();
+
+        if (ctrl_data.type == DATA_TYPE_POWER ||
+            ctrl_data.type == DATA_TYPE_VOLTAGE ||
+            ctrl_data.type == DATA_TYPE_CURRENT ||
+            ctrl_data.type == DATA_TYPE_ENERGY ||
+            ctrl_data.type == DATA_TYPE_THRESHOLD_MED ||
+            ctrl_data.type == DATA_TYPE_THRESHOLD_LOW ||
+            ctrl_data.type == DATA_TYPE_ELEC_PRICE
+        ) {
+            send_http_body_ss << "&value=" << ctrl_data.data.value;
+        }
+        else if (ctrl_data.type == DATA_TYPE_PRIORITY) {
+            send_http_body_ss << "&value_int=" << ctrl_data.data.value_int;
+        }
+        // else if (ctrl_data.type == DATA_TYPE_COMMAND) {
+        //     send_http_body_ss << "&command=" << ctrl_data.data.command;
+        // }
+        else if (ctrl_data.type == DATA_TYPE_SET_ON) {
+            send_http_body_ss << "&flag=" << ctrl_data.data.flag;
+        }
+        else if (ctrl_data.type == DATA_TYPE_DEVICE_NAME) {
+            send_http_body_ss << "&c_value=" << ctrl_data.data.c_value;
+        }
+        else {
+            ESP_LOGW(TAG, "send_data: Invalid data type");
+            return;
+        }
+                    // << "&value=" << ctrl_data.data.value
+                    // << "&value_int=" << ctrl_data.data.value_int
+                    // << "&flag=" << ctrl_data.data.flag
+                    // << "&command=" << command_str
+                    // << "&c_value=" << ctrl_data.data.c_value;
         auto send_http_body = send_http_body_ss.str();
+        ESP_LOGI(TAG, "%s", send_http_body.c_str());
         // ESP_LOGI(TAG, "%s: %s", pcName, send_http_body.c_str());
 
         auto buffer = std::unique_ptr<char, decltype(&std::free)>(
@@ -512,5 +542,15 @@ void CloudCommunication::send_wifi_status(bool online)
         .type = DATA_TYPE_WIFI_ONLINE,
     };
     ctrl_data.data.flag = online;
+    xQueueSendToBack(controller_q, &ctrl_data, 0);
+}
+
+void CloudCommunication::send_hub_id()
+{
+    controller_data ctrl_data = {
+        .device_id = 0,
+        .type = DATA_TYPE_HUB_ID
+    };
+    snprintf(ctrl_data.data.c_value, sizeof(ctrl_data.data.c_value), "%s", efuse_mac);
     xQueueSendToBack(controller_q, &ctrl_data, 0);
 }

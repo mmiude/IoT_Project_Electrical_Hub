@@ -73,15 +73,114 @@ extern "C" void app_main(void)
 
 
     static CloudCommunication cloud_communication(&ipstack, wifi_eg, cloudQueue, controllerQueue);
-    static HubCommunicationManager cloud_comm(uart, cloudQueue, controllerQueue, wifiQueue);
+    static HubCommunicationManager cloud_comm(uart, cloudQueue, controllerQueue, wifiQueue, wifi_eg);
     // vTaskDelay(pdMS_TO_TICKS(5000));
-    // controller_data ctrl_data = {};
-    // ctrl_data.type = DATA_TYPE_WIFI_SSID;
-    // snprintf(ctrl_data.data.c_value, sizeof(ctrl_data.data.c_value), "%s", SSID);
+    // controller_data ssid_data = {};
+    // ssid_data.type = DATA_TYPE_WIFI_SSID;
+    // snprintf(ssid_data.data.c_value, sizeof(ssid_data.data.c_value), "%s", SSID);
+    // // snprintf(ssid_data.data.c_value, sizeof(ssid_data.data.c_value), "bs");
+
+    // controller_data pw_data = {};
+    // pw_data.type = DATA_TYPE_WIFI_PW;
+    // snprintf(pw_data.data.c_value, sizeof(pw_data.data.c_value), "%s", PW);
+    // // snprintf(pw_data.data.c_value, sizeof(pw_data.data.c_value), "bs");
+
+    // vTaskDelay(pdMS_TO_TICKS(5000));
+    // xQueueSendToBack(wifiQueue, &ssid_data, 0);
+    // xQueueSendToBack(wifiQueue, &pw_data, 0);
+
+    // uint64_t devId = 1234;
+    // controller_data name_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_DEVICE_NAME
+    // };
+    // std::vector<controller_data> c_data_vev(12, data);
+    // for (auto &d : c_data_vev) {
+
+    // }
+
+    // snprintf(name_data.data.c_value, sizeof(name_data.data.c_value), "test_device1234");
+    // xQueueSendToBack(cloudQueue, &name_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data prio_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_PRIORITY
+    // };
+    // prio_data.data.value_int = 0;
+    // xQueueSendToBack(cloudQueue, &prio_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // prio_data.data.value_int = 1;
+    // xQueueSendToBack(cloudQueue, &prio_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // prio_data.data.value_int = 2;
+    // xQueueSendToBack(cloudQueue, &prio_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+
+    // controller_data set_on_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_SET_ON
+    // };
+    // set_on_data.data.flag = true;
+    // xQueueSendToBack(cloudQueue, &set_on_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
     
-    // controller_data ctrl_data1 = {};
-    // ctrl_data1.type = DATA_TYPE_WIFI_PW;
-    // snprintf(ctrl_data1.data.c_value, sizeof(ctrl_data1.data.c_value), "%s", PW);
+    // set_on_data.data.flag = false;
+    // xQueueSendToBack(cloudQueue, &set_on_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data med_data = {
+    //     .device_id = 0,
+    //     .type = DATA_TYPE_THRESHOLD_MED
+    // };
+    // med_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &med_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data low_data = {
+    //     .device_id = 0,
+    //     .type = DATA_TYPE_THRESHOLD_LOW
+    // };
+    // low_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &low_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data power_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_POWER
+    // };
+    // power_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &power_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data energy_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_ENERGY
+    // };
+    // energy_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &energy_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data voltage_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_VOLTAGE
+    // };
+    // voltage_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &voltage_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+
+    // controller_data current_data = {
+    //     .device_id = devId,
+    //     .type = DATA_TYPE_CURRENT
+    // };
+    // current_data.data.value = 12.3;
+    // xQueueSendToBack(cloudQueue, &current_data, 0);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+    
+
     
     // xQueueSendToBack(wifiQueue, &ctrl_data, 0);
     // xQueueSendToBack(wifiQueue, &ctrl_data1, 0);
