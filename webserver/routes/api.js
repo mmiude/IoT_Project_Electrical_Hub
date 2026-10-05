@@ -4,7 +4,7 @@ const GetElectricityPrices = require("../handlers/api/electricityPrice")
 const { ValidateAccessToken } = require("../middleware/auth")
 const { verify } = require("../deviceSign")
 const { WebSocketServer, errorMonitor } = require('ws');
-const Postgres = require("../services/database/postgres");
+const pg = require("../services/database/postgres");
 
 
 const APIRoutes = express.Router()
@@ -42,9 +42,9 @@ APIRoutes
     .post("/delete_hub_from_user", ValidateAccessToken, async (req, res) => {
         const { userId } = req.query
         try {
-            const pg = new Postgres()
+            // const pg = new Postgres()
             const deleted = await pg.delete_hub_from_user(userId)
-            await pg.sql.end()
+            // await pg.sql.end()
             if (deleted) {
                 return res.status(200).send("OK")
             }
@@ -53,12 +53,39 @@ APIRoutes
             res.status(500).send(error)
         }
     })
+    .get("/get_device_readings", ValidateAccessToken, async (req, res) => {
+        const { userId, timeData, date } = req.query
+        try {
+            const jsonData = { error: false, data: [] }
+            switch (timeData) {
+                case "chart_data_day":
+                    jsonData.data = await pg.get_hourly_energy_by_date(userId, date)
+                    break;
+                case "chart_data_week":
+                    jsonData.data = await pg.get_daily_energy_by_week(userId, date)
+                    break;
+                case "chart_data_month":
+                    jsonData.data = await pg.get_daily_energy_by_month(userId, date)
+                    break;
+                case "chart_data_year":
+                    jsonData.data = await pg.get_monthly_energy_by_year(userId, date)
+                    break;
+                default:
+                    jsonData.error = true
+                    jsonData.data = "Invalid timeData"
+                    break;
+            }
+            res.status(jsonData.error ? 406 : 200).json(jsonData)
+        } catch (error) {
+            res.status(500).json({ error: true, data: error })
+        }
+    })
     .post("/delete_hub_log", ValidateAccessToken, async (req, res) => {
         const { logId } = req.query
         try {
-            const pg = new Postgres()
+            // const pg = new Postgres()
             const deleted = await pg.delete_hub_log(logId)
-            await pg.sql.end()
+            // await pg.sql.end()
             if (deleted) {
                 return res.status(200).send("OK")
             }
@@ -75,14 +102,14 @@ APIRoutes
     .post("/send_command_to_hub", ValidateAccessToken, async (req, res) => {
         const { userId, hubId } = req.query
         // TODO: verify hub signature
-        const pg = new Postgres()
+        // const pg = new Postgres()
         const hub_signature = await pg.get_user_hub_signature(userId)
         if (hub_signature == null) {
-            await pg.sql.end()
+            // await pg.sql.end()
             return res.json({ error: true })
         }
         if (!verify(hub_signature, hubId)) {
-            await pg.sql.end()
+            // await pg.sql.end()
             console.log("Signature verification error")
             return res.json({ error: true })
         }
@@ -95,7 +122,7 @@ APIRoutes
         const targetWs = userSockets.get(hubId)
         console.log(targetWs.readyState)
         if (!targetWs || targetWs.readyState !== 1) {
-            await pg.sql.end()
+            // await pg.sql.end()
             return res.json({ error: true })
         }
 
@@ -110,7 +137,7 @@ APIRoutes
 
         if (!ws_success) {
             console.log("ws_error")
-            await pg.sql.end()
+            // await pg.sql.end()
             return res.json({ error: true })
         }
 
@@ -156,8 +183,10 @@ APIRoutes
 
                 break
             case "DATA_TYPE_PRIORITY":
+                console.log(data.value_int)
                 values = {
-                    priority: data.value_int == 0 ? "HIGH" : data.value_int == 1 ? "MED" : "LOW"
+                    // priority: data.value_int == 0 ? "HIGH" : data.value_int == 1 ? "MED" : "LOW"
+                    priority: data.value_int == 0 ? "HIGH": data.value_int == 1 ? "LOW" : "MED"
                 }
                 pg_success = await pg.update_device(deviceId, values)
                 if (pg_success) {
@@ -190,11 +219,11 @@ APIRoutes
 
         if (!pg_success) {
             console.log("pg_error")
-            await pg.sql.end()
+            // await pg.sql.end()
             return res.json({ error: true })
         }
         const logged = await pg.log_to_hub(hubId, log_message);
-        await pg.sql.end()
+        // await pg.sql.end()
         if (!logged) {
             console.log("log error")
             res.json({ error: true })

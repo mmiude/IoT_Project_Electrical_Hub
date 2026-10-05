@@ -1,6 +1,6 @@
 const config = require("../../config/app.config")
 const googleOauth = require("../../services/google/googleOauth")
-const Postgres = require("../../services/database/postgres");
+const pg = require("../../services/database/postgres");
 const { signJwt } = require("../../utils");
 const { refreshTokenCookieOptions } = require("../../config/auth.config");
 
@@ -23,9 +23,9 @@ async function googleOauthHandler(req, res) {
     const { email, given_name, family_name, picture } = googleUser.data
     const userName = `${given_name} ${family_name}`
     
-    const pg = new Postgres()
+    // const pg = new Postgres()
     const pgUserData = await pg.find_or_create_user(userName, email, picture)
-    await pg.sql.end()
+    // await pg.sql.end()
     if (pgUserData == null) {
         return res.send("Error")
     }
