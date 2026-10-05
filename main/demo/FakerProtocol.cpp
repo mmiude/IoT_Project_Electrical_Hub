@@ -3,8 +3,9 @@
 FakerProtocol::FakerProtocol(QueueHandle_t controller_q, EventGroupHandle_t e_bits, std::shared_ptr<DeviceInfoStorage<f_dev>> storage) : controller_queue(controller_q), event_group(e_bits), dev_storage(storage) {
     //init_demo_devices(); 
 
-    f_event_queue = xQueueCreate(10, sizeof(f_data));
-    xTaskCreate(FakerProtocol::runner, "FAKE_PROTOCOL", 2048, this, tskIDLE_PRIORITY + 1, &handle);
+    // was 10, maybe dropping something?
+    f_event_queue = xQueueCreate(40, sizeof(f_data));
+    xTaskCreate(FakerProtocol::runner, "FAKE_PROTOCOL", 4096, this, tskIDLE_PRIORITY + 1, &handle);
 }
 
 void FakerProtocol::init_demo_devices() {
@@ -53,6 +54,10 @@ void FakerProtocol::run() {
             if (f_devices.find(e) == f_devices.end()) {
                 controller_data data = {.device_id = e, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = FAKER}};
                 xQueueSendToBack(controller_queue, &data, 0);
+                vTaskDelay(10);
+                // this v - rene
+                controller_data metering_data = {.device_id = e, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = true}};
+                xQueueSendToBack(controller_queue, &metering_data, 0);
                 vTaskDelay(10);
             }
         }
