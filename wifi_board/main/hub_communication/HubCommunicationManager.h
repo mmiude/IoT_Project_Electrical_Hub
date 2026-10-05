@@ -1,6 +1,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include "esp_log.h"
+#include "EventBits.h"
 
 #include "HubEnums.h"
 #include "Uart.h"
@@ -12,7 +14,9 @@
 
 class HubCommunicationManager {
 public:
-    HubCommunicationManager(std::shared_ptr<Uart> uart, QueueHandle_t cloud_queue, QueueHandle_t controller_queue, QueueHandle_t wifi_queue);
+    HubCommunicationManager(std::shared_ptr<Uart> uart,
+        QueueHandle_t cloud_queue, QueueHandle_t controller_queue, QueueHandle_t wifi_queue,
+        EventGroupHandle_t _wifi_eg);
 
 private: 
     static void runner_tx(void *params);
@@ -32,6 +36,8 @@ private:
 
     TaskHandle_t tx_handle;
     TaskHandle_t rx_handle; 
+
+    EventGroupHandle_t wifi_eg;
 
     std::string convert_controller_data_to_json(controller_data &data);
     controller_data convert_json_to_controller_data(std::string &line);

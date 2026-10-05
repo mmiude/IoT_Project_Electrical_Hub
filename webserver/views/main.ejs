@@ -51,17 +51,22 @@
                 </div>
 
                 <div class="flex justify-between">
+                    <span>Date:</span>
+                    <input type="date" id="chart_data_by_date">
+                </div>
+
+                <div class="flex justify-between">
                     <span>Show on chart:</span>
                     <div class="inline-flex items-center gap-2">
-                        <label for="switch-component-on" class="text-slate-600 text-sm cursor-pointer">kWh</label>
+                        <label for="switch-component-on_kwh_eur" class="text-slate-600 text-sm cursor-pointer">kWh</label>
                         
                         <div class="relative inline-block w-11 h-5">
-                            <input id="switch-component-on" type="checkbox" class="peer appearance-none w-11 h-5 bg-[#12005e] rounded-full cursor-pointer transition-colors duration-300" />
-                            <label for="switch-component-on" class="absolute top-0 left-0 w-5 h-5 bg-white rounded-full border border-slate-300 shadow-sm transition-transform duration-300 peer-checked:translate-x-6 peer-checked:border-slate-800 cursor-pointer">
+                            <input id="switch-component-on_kwh_eur" type="checkbox" class="peer appearance-none w-11 h-5 bg-[#12005e] rounded-full cursor-pointer transition-colors duration-300" />
+                            <label for="switch-component-on_kwh_eur" class="absolute top-0 left-0 w-5 h-5 bg-white rounded-full border border-slate-300 shadow-sm transition-transform duration-300 peer-checked:translate-x-6 peer-checked:border-slate-800 cursor-pointer">
                             </label>
                         </div>
                         
-                        <label for="switch-component-on" class="text-slate-600 text-sm cursor-pointer">Eur</label>
+                        <label for="switch-component-on_kwh_eur" class="text-slate-600 text-sm cursor-pointer">Eur</label>
                     </div>
                 </div>
                 <div class="flex justify-between pr-7">
@@ -110,8 +115,8 @@
                             </span>
                             <select name="device_priority" id="device_priority|<%= device.id %>" class="text-sm w-fit border-none rounded cursor-pointer">
                                 <option value="0" <%= device.priority === 'HIGH' ? 'selected' : '' %>>HIGH</option>
-                                <option value="1" <%= device.priority === 'MED' ? 'selected' : '' %>>MED</option>
-                                <option value="2" <%= device.priority === 'LOW' ? 'selected' : '' %>>LOW</option>
+                                <option value="2" <%= device.priority === 'MED' ? 'selected' : '' %>>MED</option>
+                                <option value="1" <%= device.priority === 'LOW' ? 'selected' : '' %>>LOW</option>
                             </select>
                         </div>
                         <div class="flex flex-col justify-center">
@@ -247,7 +252,7 @@
         // LoadChart(months, datasets)
         const userData = <%- JSON.stringify(data.user) %>;
         const hubData = <%- JSON.stringify(data.hub) %>;
-        console.log(hubData.logs)
+        // console.log(hubData.logs)
 
         // const userId = <%- JSON.stringify(data.userId) %>;
         // const user_hub = <%- JSON.stringify(data.user_hub) %>;
@@ -263,8 +268,9 @@
         // console.log(daily_week)
         // console.log(daily_month)
         // console.log(monthly)
+        // console.log(hubData.device_readings)
         DeviceAndHubModifyEvents(userData.userId, hubData.hub_id, userData.access_token)
-        LoadChartDataBy(hubData.device_readings)
+        LoadChartDataBy(userData.userId, userData.access_token)
         // renderDevices(<%- JSON.stringify(data.devices) %>)
     </script>
 </body>
