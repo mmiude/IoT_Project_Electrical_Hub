@@ -44,6 +44,8 @@ public:
     virtual void on_device_removed(uint64_t id) {}
     virtual void on_price_changed(float price) {}
     virtual void on_thresholds_changed(float low, float med) {}
+    virtual void on_hub_id_changed(const std::string &hub_id) {}
+    virtual void on_wifi_online_changed(bool online) {}
 };
 
 // controller messages (ui queue) -> ui: device map, price, thresholds
@@ -89,6 +91,10 @@ public:
     float price() const { return current_price; }
     float threshold_low() const { return low_threshold; }
     float threshold_medium() const { return med_threshold; }
+    bool has_hub_id() const { return hub_id_known; }
+    const std::string &hub_id() const { return hub_id_value; }
+    bool has_wifi_status() const { return wifi_online_known; }
+    bool wifi_online() const { return wifi_online_value; }
 
 private:
     QueueHandle_t controller_queue;
@@ -101,6 +107,10 @@ private:
     bool price_known{false};
     float low_threshold{0.0f};
     float med_threshold{0.0f};
+    std::string hub_id_value;
+    bool hub_id_known{false};
+    bool wifi_online_value{false};
+    bool wifi_online_known{false};
 
     bool send(const controller_data &msg);
     bool send_to_cloud(const controller_data &msg);
@@ -115,6 +125,8 @@ private:
 
     void notify_price();
     void notify_thresholds();
+    void notify_hub_id();
+    void notify_wifi_online();
 };
 
 #endif // UI_MODEL_H

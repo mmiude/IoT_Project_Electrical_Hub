@@ -197,12 +197,12 @@ void HomeScreen::build_row(uint64_t id, const UiDevice &dev)
 void HomeScreen::apply_row(DeviceRow &row, const UiDevice &dev)
 {
     lv_label_set_text(row.name_label, dev.name.c_str());
-    lv_label_set_text(row.priority_label_obj, dev.pending ? "Tap to set up" : priority_label(dev.priority));
+    if (!dev.online) lv_label_set_text(row.priority_label_obj, "Disconnected");
+    else lv_label_set_text(row.priority_label_obj, dev.pending ? "Tap to '+' set up" : priority_label(dev.priority));
 
     if (dev.on) lv_obj_add_state(row.sw, LV_STATE_CHECKED);
     else lv_obj_clear_state(row.sw, LV_STATE_CHECKED);
 
-    // offline devices should just dim for now!
     lv_obj_set_style_opa(row.container, dev.online ? LV_OPA_COVER : LV_OPA_50, 0);
 }
 
@@ -298,11 +298,11 @@ lv_obj_t *HomeScreen::build(UiModel &m)
     build_threshold_chip(top_bar, 112, 130);
     build_chip(top_bar, 250, 104, "Usage", USAGE_COLOR, &usage_value);
 
-    lv_obj_t *add_btn = create_icon_button(top_bar, LV_SYMBOL_PLUS, 0x333333);
-    lv_obj_align(add_btn, LV_ALIGN_RIGHT_MID, -44, 0);
+    lv_obj_t *add_btn = create_icon_button(top_bar, LV_SYMBOL_PLUS, 0x333333, 40);
+    lv_obj_align(add_btn, LV_ALIGN_RIGHT_MID, -50, 0);
     lv_obj_add_event_cb(add_btn, add_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *settings_btn = create_icon_button(top_bar, LV_SYMBOL_SETTINGS, 0x333333);
+    lv_obj_t *settings_btn = create_icon_button(top_bar, LV_SYMBOL_SETTINGS, 0x333333, 40);
     lv_obj_align(settings_btn, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_add_event_cb(settings_btn, settings_btn_cb, LV_EVENT_CLICKED, NULL);
 

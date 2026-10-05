@@ -49,9 +49,19 @@ void UiModel::handle_message(const controller_data &msg) {
             price_known = true;
             notify_price();
             return;
-        // case DATA_TYPE_UI_SYNC_DONE:
-        //     prune_unconfirmed();
-        //     return;
+        case DATA_TYPE_HUB_ID:
+            hub_id_value = msg.data.c_value;
+            hub_id_known = true;
+            notify_hub_id();
+            return;
+        case DATA_TYPE_WIFI_ONLINE:
+            wifi_online_value = msg.data.flag;
+            wifi_online_known = true;
+            notify_wifi_online();
+            return;
+        case DATA_TYPE_UI_SYNC_DONE:
+            prune_unconfirmed();
+            return;
         default:
             break;
     }
@@ -110,6 +120,13 @@ void UiModel::handle_message(const controller_data &msg) {
             break;
         case DATA_TYPE_PRIORITY:
             dev.priority = msg.data.value_int;
+            dev.confirmed = true; // (replays priority per device)
+            break;
+        case DATA_TYPE_DEVICE_NAME:
+            // renamed from the website, just apply + save, don't send back to cloud (would bounce right back)
+            dev.name = msg.data.c_value;
+            dev.pending = false;
+            save_name(dev);
             break;
         default:
             ESP_LOGI(TAG, "dev 0x%016llx: unhandled type %d", msg.device_id, (int)msg.type);
@@ -154,15 +171,18 @@ void UiModel::name_device(uint64_t id, const std::string &name, int priority) {
     if (it == device_map.end()) return;
     UiDevice &dev = it->second;
 
+    bool name_changed = dev.name != name;
     dev.name = name;
     dev.pending = false;
     save_name(dev);
 
-    controller_data name_msg{};
-    name_msg.device_id = id;
-    name_msg.type = DATA_TYPE_DEVICE_NAME;
-    snprintf(name_msg.data.c_value, sizeof(name_msg.data.c_value), "%s", name.c_str());
-    send_to_cloud(name_msg);
+    if (name_changed) {
+        controller_data name_msg{};
+        name_msg.device_id = id;
+        name_msg.type = DATA_TYPE_DEVICE_NAME;
+        snprintf(name_msg.data.c_value, sizeof(name_msg.data.c_value), "%s", name.c_str());
+        send_to_cloud(name_msg);
+    }
 
     set_priority(id, priority); // also notifies listeners
 }
@@ -258,4 +278,12 @@ void UiModel::notify_price() {
 
 void UiModel::notify_thresholds() {
     for (auto *l : listeners) l->on_thresholds_changed(low_threshold, med_threshold);
+}
+
+void UiModel::notify_hub_id() {
+    for (auto *l : listeners) l->on_hub_id_changed(hub_id_value);
+}
+
+void UiModel::notify_wifi_online() {
+    for (auto *l : listeners) l->on_wifi_online_changed(wifi_online_value);
 }

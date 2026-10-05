@@ -183,8 +183,9 @@ void DeviceManagementScreen::apply_row(DeviceRow &row, const UiDevice &dev)
 {
     lv_label_set_text(row.name_label, dev.name.c_str());
 
-    char buf[24];
-    if (dev.supports_metering) snprintf(buf, sizeof(buf), "%.0f W", dev.power);
+    char buf[32];
+    if (!dev.online) snprintf(buf, sizeof(buf), "Disconnected");
+    else if (dev.supports_metering) snprintf(buf, sizeof(buf), "%.0f W - %.2f kWh", dev.power, dev.energy);
     else snprintf(buf, sizeof(buf), "no metering");
     lv_label_set_text(row.watt_label, buf);
 

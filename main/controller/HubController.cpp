@@ -55,18 +55,27 @@ void HubController::run(){
                 check_low_thresholds();
                 system_config_storage->save_low_threshold(ctrl_data.data.value);
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
+                // website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_THRESHOLD_MED:
-                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value); 
+                ESP_LOGI(TAG, "new medium threshold received: %.2f.", ctrl_data.data.value);
                 threshold_medium = ctrl_data.data.value;
                 check_medium_thresholds();
                 system_config_storage->save_med_threshold(ctrl_data.data.value);
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
-                break; 
-            case DATA_TYPE_PRIORITY: 
+                //website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
+                break;
+            case DATA_TYPE_PRIORITY:
                 modify_dev_priority(ctrl_data.device_id, ctrl_data.data.value_int);
-                ESP_LOGI(TAG, "new device priority recieved"); 
+                ESP_LOGI(TAG, "new device priority recieved");
                 xQueueSendToBack(cloud_queue, &ctrl_data, 0);
+                // website -> ui
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
+                break;
+            case DATA_TYPE_DEVICE_NAME:
+                xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
             case DATA_TYPE_AUTOMATION:
                 modify_dev_automation(ctrl_data.device_id, ctrl_data.data.flag);
@@ -236,26 +245,28 @@ void HubController::check_medium_thresholds(){
 }
 
 void HubController::command_handler(controller_data &data){
+    if (data.data.command == OPEN_NETWORK) {
+        // ui needs this to start the 3 min window again (we otherwise get "E (11098) HUB_CONTROLLER: DEVICE NOT ON CONTROLLER MAP")
+        for (auto protocol : plugProtocols) protocol->open_network();
+        return;
+    }
 
     auto it = devices.find(data.device_id);
     deviceInfo *dev = (it != devices.end()) ? &it->second : nullptr; 
 
-    if (dev) { 
-        
+    if (dev) {
+
         switch(data.data.command) {
             case TOGGLE_PLUG:
                 plugProtocols.at(dev->protocol)->toggle_plug(data.device_id);
                 break;
-            case PLUG_ON: 
+            case PLUG_ON:
                 plugProtocols.at(dev->protocol)->set_plug_on(data.device_id);
                 break;
             case PLUG_OFF:
                 plugProtocols.at(dev->protocol)->set_plug_off(data.device_id);
-                break; 
-            case OPEN_NETWORK:
-                plugProtocols.at(dev->protocol)->open_network();
                 break;
-            case REMOVE_DEVICE: 
+            case REMOVE_DEVICE:
                 plugProtocols.at(dev->protocol)->delete_device(data.device_id);
                 remove_device(data.device_id);
                 break;
@@ -263,7 +274,7 @@ void HubController::command_handler(controller_data &data){
                 ESP_LOGE(TAG, "Unknown command request");
                 break;
         }
-    } else ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP"); 
+    } else ESP_LOGE(TAG, "DEVICE NOT ON CONTROLLER MAP");
 }
 
 void HubController::periodic_device_check(){
