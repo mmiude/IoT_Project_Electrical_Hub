@@ -171,15 +171,18 @@ void UiModel::name_device(uint64_t id, const std::string &name, int priority) {
     if (it == device_map.end()) return;
     UiDevice &dev = it->second;
 
+    bool name_changed = dev.name != name;
     dev.name = name;
     dev.pending = false;
     save_name(dev);
 
-    controller_data name_msg{};
-    name_msg.device_id = id;
-    name_msg.type = DATA_TYPE_DEVICE_NAME;
-    snprintf(name_msg.data.c_value, sizeof(name_msg.data.c_value), "%s", name.c_str());
-    send_to_cloud(name_msg);
+    if (name_changed) {
+        controller_data name_msg{};
+        name_msg.device_id = id;
+        name_msg.type = DATA_TYPE_DEVICE_NAME;
+        snprintf(name_msg.data.c_value, sizeof(name_msg.data.c_value), "%s", name.c_str());
+        send_to_cloud(name_msg);
+    }
 
     set_priority(id, priority); // also notifies listeners
 }
