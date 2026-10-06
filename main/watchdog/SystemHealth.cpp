@@ -50,7 +50,7 @@ void SystemHealth::run() {
             wifi_state = false; 
         } else {
             if (!wifi_state) {
-                ctrl_data = {.device_id = 0, .type = DATA_TYPE_WIFI_ONLINE, .data = {.flag = false}};
+                ctrl_data = {.device_id = 0, .type = DATA_TYPE_WIFI_ONLINE, .data = {.flag = true}};
                 xQueueSendToBack(controller_queue, &ctrl_data, 0);
             }
             wifi_state = true;

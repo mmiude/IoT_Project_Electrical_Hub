@@ -41,7 +41,6 @@ void HubController::run(){
     else check_device_map();
     system_config_storage->get_threshold_levels(threshold_low, threshold_medium); // if there is no values saved these returns zeros 
     ESP_LOGW(TAG, "read following values low: %f, med: %f", threshold_low, threshold_medium);
-    // here we can send sync to ui -> ui don't need to ask sync separately... 
     send_ui_sync(); 
     
     while (true) {
@@ -74,9 +73,9 @@ void HubController::run(){
                 // website -> ui
                 xQueueSendToBack(ui_queue, &ctrl_data, 0);
                 break;
-            case DATA_TYPE_DEVICE_NAME:
-                xQueueSendToBack(ui_queue, &ctrl_data, 0);
-                break;
+            //case DATA_TYPE_DEVICE_NAME:
+                //xQueueSendToBack(ui_queue, &ctrl_data, 0);
+                //break;
             case DATA_TYPE_AUTOMATION:
                 modify_dev_automation(ctrl_data.device_id, ctrl_data.data.flag);
                 break;
@@ -105,6 +104,7 @@ void HubController::run(){
                 break;
             case DATA_TYPE_WIFI_ONLINE:
                 if (!ctrl_data.data.flag) xQueueSendToBack(ui_queue, &ctrl_data, 0); 
+                xQueueSendToBack(ui_queue, &ctrl_data, 0); 
                 break;
             default:
                 handle_zigbee_events(ctrl_data);
@@ -175,7 +175,7 @@ void HubController::handle_zigbee_events(controller_data &data){
             dev->on = data.data.flag;
             dev->last_seen = xTaskGetTickCount();
             //ESP_LOGI(TAG, "on/off state update %s", data.data.flag ? "ON" : "OFF");
-            if (dev->automation_on && !threshold_allows_opening(dev->priority)) plugProtocols.at(dev->protocol)->set_plug_off(data.device_id); 
+            if (dev->automation_on && !threshold_allows_opening(dev->priority) && data.data.flag) plugProtocols.at(dev->protocol)->set_plug_off(data.device_id); 
             xQueueSendToBack(ui_queue, &data, 0);
             xQueueSendToBack(cloud_queue, &data, 0);
         }  
@@ -345,6 +345,7 @@ void HubController::remove_device(uint64_t dev_id) {
     //ESP_LOGI(TAG, "device 0x%016llx removed from hub.", dev_id);
     controller_data left_msg = {.device_id = dev_id, .type = DATA_TYPE_DEVICE_LEFT, .data = {}};
     xQueueSendToBack(ui_queue, &left_msg, 0);
+    xQueueSendToBack(cloud_queue, &left_msg, 0);
     ESP_LOGI(TAG, "map size: %d", devices.size());
 }
 
@@ -367,10 +368,12 @@ void HubController::send_ui_sync(){
     ok &= push_to_ui(msg);
 
     for (auto &[key, dev] : devices) {
+        dev.last_seen = xTaskGetTickCount();
+        dev.online = false; 
         msg = {.device_id = key, .type = DATA_TYPE_PRIORITY, .data = {.value_int = dev.priority}}; // we could send only this -> so one message per dev in sync and set confirmed true under priority data type in ui model.cpp
         ok &= push_to_ui(msg);
-        //msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
-        //ok &= push_to_ui(msg);
+        msg = {.device_id = key, .type = DATA_TYPE_SUPPORTS_METERING, .data = {.flag = dev.support_energy_consumption}}; // does ui actaully use this anywhere? we could just display energy if received...
+        ok &= push_to_ui(msg);
     }
 
     if (ok) {
@@ -379,4 +382,8 @@ void HubController::send_ui_sync(){
     } else {
         ESP_LOGE(TAG, "ui queue full during sync, some state was dropped.");
     }
+
+    // after sync is done we reqeust dev state once...
+    for (auto &[key, dev] : devices) plugProtocols.at(dev.protocol)->request_on_off_state(key);
+
 }

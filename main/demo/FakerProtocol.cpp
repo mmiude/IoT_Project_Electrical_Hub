@@ -4,38 +4,49 @@ FakerProtocol::FakerProtocol(QueueHandle_t controller_q, EventGroupHandle_t e_bi
     //init_demo_devices(); 
 
     // was 10, maybe dropping something?
-    f_event_queue = xQueueCreate(40, sizeof(f_data));
+    f_event_queue = xQueueCreate(20, sizeof(f_data));
     xTaskCreate(FakerProtocol::runner, "FAKE_PROTOCOL", 4096, this, tskIDLE_PRIORITY + 1, &handle);
 }
 
-void FakerProtocol::init_demo_devices() {
+void FakerProtocol::init_demo_device(uint64_t dev_id) {
+
     // fake fridge
-    f_devices[1001] = f_dev{
+    if (dev_id == 1001) {
+         f_devices[1001] = f_dev{
         .dev_id = 1001,
         .active_power = 120.0,
         .idle_power = 4.0,
         .is_on = true,
         .total_energy_consumption = 0.5,
         .last_energy_update = 0,
-    };
+        };
+    }
+   
     // fake floor heating
-    f_devices[1002] = f_dev{
+    else if (dev_id == 1002) {
+        f_devices[1002] = f_dev{
         .dev_id = 1002,
-        .active_power = 2200.0,
+        .active_power = 1200.0,
         .idle_power = 0.0,
         .is_on = true, 
         .total_energy_consumption = 0.2,
         .last_energy_update = 0,
-    };
-    // fake air conditioner
-    f_devices[1003] = f_dev{
+        };
+    }
+    
+     // fake air conditioner
+    else if (dev_id == 1003) {
+        f_devices[1003] = f_dev{
         .dev_id = 1003, 
         .active_power = 900.0,
         .idle_power = 12.0,
-        .is_on = false,
+        .is_on = true,
         .total_energy_consumption = 0.3,
         .last_energy_update = 0,
-    };
+        };
+    } 
+
+    else ESP_LOGW("FAKER", "UNKNOWN DEVICE.");
 }
 
 void FakerProtocol::runner(void *params){
@@ -52,6 +63,7 @@ void FakerProtocol::run() {
     if (f_devices.size() < 3) {  // check if some of the demo devices has been erased -> send dev join data type to add them again
         for (auto e : expected_devs) {
             if (f_devices.find(e) == f_devices.end()) {
+                init_demo_device(e);
                 controller_data data = {.device_id = e, .type = DATA_TYPE_DEVICE_JOIN, .data = {.value_int = FAKER}};
                 xQueueSendToBack(controller_queue, &data, 0);
                 vTaskDelay(10);
@@ -63,8 +75,11 @@ void FakerProtocol::run() {
         }
     }
 
-    init_demo_devices(); // we init all devices any way -> overwriting does not matter in this case...
-    for (auto &[key, dev] : f_devices) dev_storage->save_device(key, dev); // save all for nex time... for demo this is good enough... 
+    for (auto &[key, dev] : f_devices) {
+        dev_storage->save_device(key, dev);
+        //dev.total_energy_consumption = 0;
+        dev.last_energy_update = xTaskGetTickCount();
+    }   
 
     f_data event{};
     controller_data ctrl_data{};
@@ -149,7 +164,7 @@ void FakerProtocol::request_on_off_state(uint64_t device_id){
     if (dev) {
         data = {.type = STATE, .dev_id = device_id, .data = {.flag = dev->is_on}};
         xQueueSendToBack(f_event_queue, &data, 0);
-    }
+    } else ESP_LOGE("FAKER", "could not find f_dev");
 }
 
 void FakerProtocol::toggle_plug(uint64_t device_id){
@@ -160,7 +175,7 @@ void FakerProtocol::toggle_plug(uint64_t device_id){
         dev->is_on = !dev->is_on; 
         data = {.type = STATE, .dev_id = device_id, .data = {.flag = dev->is_on}};
         xQueueSendToBack(f_event_queue, &data, 0);
-    }
+    } else ESP_LOGE("FAKER", "could not find f_dev");
 }
 
 void FakerProtocol::set_plug_on(uint64_t device_id){
@@ -171,7 +186,7 @@ void FakerProtocol::set_plug_on(uint64_t device_id){
         dev->is_on = true; 
         data = {.type = STATE, .dev_id = device_id, .data = {.flag = dev->is_on}};
         xQueueSendToBack(f_event_queue, &data, 0);
-    }
+    } else ESP_LOGE("FAKER", "could not find f_dev");
 }
 
 void FakerProtocol::set_plug_off(uint64_t device_id){
@@ -182,7 +197,7 @@ void FakerProtocol::set_plug_off(uint64_t device_id){
         dev->is_on = false; 
         data = {.type = STATE, .dev_id = device_id, .data = {.flag = dev->is_on}};
         xQueueSendToBack(f_event_queue, &data, 0);
-    }
+    } else ESP_LOGE("FAKER", "could not find f_dev");
 }   
 
 void FakerProtocol::open_network() {

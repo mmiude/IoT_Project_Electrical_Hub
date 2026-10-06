@@ -92,7 +92,7 @@ void CloudCommunicationManager::run_rx() {
                         ESP_LOGI("CLOUD COMM", "received json: %s", line.c_str()); 
                         controller_data data = convert_json_to_controller_data(line);
                         ESP_LOGI("CLOUD COMM", "controller data id: 0x%016llx", data.device_id);
-                        if (data.type == DATA_TYPE_HUB_ID) xQueueSendToBack(ui_q, &data, 0);
+                        if (data.type == DATA_TYPE_HUB_ID || data.type == DATA_TYPE_DEVICE_NAME) xQueueSendToBack(ui_q, &data, 0);
                         else if (data.type == DATA_TYPE_WIFI_ONLINE) xEventGroupSetBits(event_bits, WIFI_ALIVE_BIT); 
                         else xQueueSendToBack(controller_q, &data, 0); 
                     }
