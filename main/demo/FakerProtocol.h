@@ -65,7 +65,7 @@ private:
     TaskHandle_t handle; 
 
     std::map<uint64_t, f_dev> f_devices; 
-    void init_demo_devices();
+    void init_demo_device(uint64_t dev_id);
 
     float get_voltage(const f_dev &dev);
     float get_power(const f_dev &dev);
