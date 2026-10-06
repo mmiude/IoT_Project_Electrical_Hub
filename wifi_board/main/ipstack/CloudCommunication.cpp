@@ -325,10 +325,10 @@ void CloudCommunication::send_data()
             ESP_LOGI(TAG, "Invalid datatype");
             return;
         }
-        std::string_view command_str = "UNKNOWN";
-        if (ctrl_data.type == DATA_TYPE_COMMAND) {
-            command_str = convertEnum<std::string_view>(ctrl_data.data.command).value_or("UNKNOWN");
-        }
+        // std::string_view command_str = "UNKNOWN";
+        // if (ctrl_data.type == DATA_TYPE_COMMAND) {
+        //     command_str = convertEnum<std::string_view>(ctrl_data.data.command).value_or("UNKNOWN");
+        // }
 
         std::ostringstream send_http_body_ss;
         send_http_body_ss << "device_id=" << ctrl_data.device_id
@@ -350,13 +350,13 @@ void CloudCommunication::send_data()
         // else if (ctrl_data.type == DATA_TYPE_COMMAND) {
         //     send_http_body_ss << "&command=" << ctrl_data.data.command;
         // }
-        else if (ctrl_data.type == DATA_TYPE_SET_ON) {
+        else if (ctrl_data.type == DATA_TYPE_SET_ON || ctrl_data.type == DATA_TYPE_ONLINE_STATE) {
             send_http_body_ss << "&flag=" << ctrl_data.data.flag;
         }
         else if (ctrl_data.type == DATA_TYPE_DEVICE_NAME) {
             send_http_body_ss << "&c_value=" << ctrl_data.data.c_value;
         }
-        else {
+        else if (ctrl_data.type != DATA_TYPE_DEVICE_LEFT) {
             ESP_LOGW(TAG, "send_data: Invalid data type");
             return;
         }
