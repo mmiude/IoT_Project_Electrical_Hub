@@ -680,3 +680,18 @@ async function DeleteLog(logId, access_token) {
         window.location.reload()
     }
 }
+
+async function DeleteLogs(hubId, access_token) {
+    const req = await fetch(`/api/delete_hub_logs?hubId=${hubId}`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${access_token}`
+        }
+    })
+    const message = await req.text()
+    if (req.status != 200) {
+        alert(`Error deleting logs:\n${message}`)
+    } else if (message == "OK") {
+        window.location.reload()
+    }
+}

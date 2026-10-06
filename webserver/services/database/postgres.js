@@ -79,8 +79,8 @@ class Postgres {
 
     async create_device(device_id, name, hub_id) {
         const q = await this.sql`
-            INSERT INTO device (id, hub_id, name, is_on)
-            VALUES (${device_id}, ${hub_id}, ${name}, false)
+            INSERT INTO device (id, hub_id, name, is_on, online)
+            VALUES (${device_id}, ${hub_id}, ${name}, false, true)
             RETURNING id
         `;
         return q.count > 0;
@@ -154,7 +154,7 @@ class Postgres {
 
     async get_user_devices(userId) {
         return await this.sql`
-            SELECT d.id, d.hub_id, d.name, d.priority, d.is_on
+            SELECT d.id, d.hub_id, d.name, d.priority, d.is_on, d.online
             FROM device d
             INNER JOIN hub_user hu ON d.hub_id = hu.hub_id
             WHERE hu.id = ${userId}
@@ -216,6 +216,23 @@ class Postgres {
             DELETE FROM hub_logs WHERE id = ${logId}
         `;
         return deleted.count > 0;
+    }
+    async delete_hub_logs(hubId) {
+        const deleted = await this.sql`
+            DELETE FROM hub_logs WHERE hub_id = ${hubId}
+        `
+        return deleted.count > 0
+    }
+
+    async delete_device(deviceId) {
+        await this.sql`
+            DELETE FROM device_readings WHERE device_id = ${deviceId}
+        `
+        const deleted = await this.sql`
+            DELETE FROM device WHERE id = ${deviceId}
+        `
+        return deleted.count > 0
+
     }
 
     async log_to_hub(hubId, text) {

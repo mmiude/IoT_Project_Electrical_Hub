@@ -71,24 +71,12 @@ async function SendDeviceData(req, res) {
                 values = {
                     is_on: flag == 1
                 }
-                console.log(device_id)
-                console.log(values)
-                const on_off = flag ? "ON" : "OFF"
                 success = await pg.update_device(device_id, values)
                 if (success) {
+                    const on_off = values.is_on ? "ON" : "OFF"
                     message = `Device ${device_id} turned ${on_off}`;   
                 }
                 break
-                // Fixed logical error: used && instead of ||
-                // if (command !== "PLUG_ON" && command !== "PLUG_OFF") {
-                //     break;
-                // }
-                // values = { is_on: command === "PLUG_ON" };
-                // success = await pg.update_device(device_id, values);
-                // if (success) {
-                //     message = `Device ${device_id} turned ${command.split("_")[1]}`;
-                // }
-                // break;
 
             case "DATA_TYPE_DEVICE_NAME": // 3
                 const found = await pg.find_device(device_id)
@@ -98,7 +86,7 @@ async function SendDeviceData(req, res) {
                     }
                     success = await pg.update_device(device_id, values)
                     if (success) {
-                        message = `Device ${device_id} name updated to ${c_value}`
+                        message = `Device ${device_id} name updated to ${c_value}.`
                     }
                     break
                 }
@@ -109,17 +97,29 @@ async function SendDeviceData(req, res) {
                 }
                 break;
 
+            case "DATA_TYPE_ONLINE_STATE":
+                values = {
+                    online: flag == 1
+                }
+                success = await pg.update_device(device_id, values)
+                if (success) {
+                    const online = values.online ? "online" : "offline"
+                    message = `Device ${device_id} is ${online}.`
+                }
+                break
+
             case "DATA_TYPE_DEVICE_LEFT":
-                success = true;
+                console.log(type)
+                success = await pg.delete_device(device_id);
+                if (success) {
+                    message = `Device ${device_id} removed.`
+                }
                 break;
 
             case "DATA_TYPE_PRIORITY": // 6
                 values = {
-                    priority: value_int === 0 ? "HIGH" : value_int === 1 ? "LOW" : "MED"
+                    priority: value_int == 0 ? "HIGH" : value_int == 1 ? "LOW" : "MED"
                 };
-                console.log(device_id)
-                console.log(type)
-                console.log(values)
                 success = await pg.update_device(device_id, values);
                 if (success) {
                     message = `Device ${device_id} priority updated to ${values.priority}.`;

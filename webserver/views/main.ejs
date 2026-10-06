@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Spikestriker</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -104,7 +104,12 @@
 
             <div id="devices_container" class="flex flex-col gap-1 overflow-auto">
                 <% data.hub.devices.forEach((device) => { %>
-                    <div class="hover:bg-slate-200 rounded-md border-solid border-black border-1 w-full flex justify-between p-2">
+                    <div
+                        <% if (device.online) { %>
+                            class="hover:bg-slate-200 rounded-md border-solid border-black border-1 w-full flex justify-between p-2">
+                        <% } else { %>
+                            class="hover:bg-slate-200 rounded-md border-solid border-black border-1 w-full flex justify-between p-2 bg-slate-100 opacity-50">
+                        <% } %>
                         <div class="flex flex-col">
                             <span 
                                 id="device_name|<%= device.id %>"
@@ -113,14 +118,37 @@
                             >
                                 <%= device.name %>
                             </span>
-                            <select name="device_priority" id="device_priority|<%= device.id %>" class="text-sm w-fit border-none rounded cursor-pointer">
-                                <option value="0" <%= device.priority === 'HIGH' ? 'selected' : '' %>>HIGH</option>
-                                <option value="2" <%= device.priority === 'MED' ? 'selected' : '' %>>MED</option>
-                                <option value="1" <%= device.priority === 'LOW' ? 'selected' : '' %>>LOW</option>
-                            </select>
+                            <div class="flex items-center px-1">
+                                <div
+                                    class="w-[10px] h-[10px] rounded-full"
+                                    <% if (device.priority === 'HIGH') { %>
+                                        style="background-color:red"
+                                    <% } else if (device.priority == 'MED') { %>
+                                        style="background-color:yellow"
+                                    <% } else { %>
+                                        style="background-color:green"
+                                    <% } %>
+                                >
+                                </div>
+                                <select name="device_priority" id="device_priority|<%= device.id %>"
+                                    class="text-sm w-fit border-none rounded cursor-pointer">
+                                    <option value="0" <%= device.priority === 'HIGH' ? 'selected' : '' %>>HIGH</option>
+                                    <option value="2" <%= device.priority === 'MED' ? 'selected' : '' %>>MED</option>
+                                    <option value="1" <%= device.priority === 'LOW' ? 'selected' : '' %>>LOW</option>
+                                </select>
+                            </div>
+                            <span class="text-xs opacity-80 px-1">
+                                <%= device.online ? 'online' : 'offline' %>
+                            </span>
                         </div>
                         <div class="flex flex-col justify-center">
-                            <div class="relative inline-block w-11 h-5">
+                            <div
+                                <% if (device.online) { %>
+                                    class="relative inline-block w-11 h-5"
+                                <% } else { %>
+                                    class="relative inline-block w-11 h-5 pointer-events-none"
+                                <% } %>
+                            >
                                 <input 
                                     <%= device.is_on ? 'checked' : '' %> 
                                     id="device_on|<%= device.id %>" 
@@ -210,30 +238,42 @@
                         </div>
                     </div>
                 </div>
-                <div class="flex flex-col p-2 border-1 border-solid border-black rounded-md flex-1 overflow-auto">
-                    <h1 class="px-1">Logs:</h1>
+                <div class="flex flex-col p-2 border-1 border-solid border-black rounded-md flex-1 min-h-0">
+                    <div class="px-1 pb-2 shrink-0 flex justify-between items-center border-b-1 border-solid border-black">
+                        <h1>Logs</h1>
+                        <button
+                            id="clear_logs"
+                            class="cursor-pointer h-full px-4 rounded-md bg-red-500 text-white active:scale-95"
+                            onclick="DeleteLogs(<%= JSON.stringify(data.hub.hub_id) %>, <%= JSON.stringify(data.user.access_token) %>)"
+                        >
+                            Clear logs
+                        </button>
+                    </div>
 
-                    <% if (data.hub.logs.length > 0) { %>
-                    <%      data.hub.logs.forEach((log) => { %>
-                                <div class="text-sm px-1 flex justify-between items-start border-b-1 border-solid border-black py-1">
-                                    <div class="flex flex-col min-w-0 flex-1 border-r-1 border-solid border-black ">
-                                        <span class="px-1 shrink-0">
-                                            <b><%= new Date(new Date(log.timestamp).getTime() + 6 * 60 * 60 * 1000).toISOString() %></b>
-                                        </span>
-                                        <span class="break-all px-4"><%= log.log_text %></span>
+                    <!-- Scrollable container for logs -->
+                    <div class="overflow-auto flex-1 min-h-0 px-1">
+                        <% if (data.hub.logs.length > 0) { %>
+                        <%      data.hub.logs.forEach((log) => { %>
+                                    <div class="text-sm px-1 flex justify-between items-start border-b-1 border-solid border-black py-1">
+                                        <div class="flex flex-col min-w-0 flex-1 border-r-1 border-solid border-black ">
+                                            <span class="px-1 shrink-0">
+                                                <b><%= new Date(new Date(log.timestamp).getTime() + 6 * 60 * 60 * 1000).toISOString() %></b>
+                                            </span>
+                                            <span class="break-all px-4"><%= log.log_text %></span>
+                                        </div>
+                                        
+                                        <button
+                                            class="cursor-pointer hover:scale-105 shrink-0 ml-2 flex items-center justify-center h-full"
+                                            onclick="DeleteLog(<%= JSON.stringify(log.id) %>, <%= JSON.stringify(data.user.access_token) %>)"
+                                        >
+                                            <img src="/static/icons/delete.png" alt="delete_log" class="w-[20px]">
+                                        </button>
                                     </div>
-                                    
-                                    <button
-                                        class="cursor-pointer hover:scale-105 shrink-0 ml-2 flex items-center justify-center h-full"
-                                        onclick="DeleteLog(<%= JSON.stringify(log.id) %>, <%= JSON.stringify(data.user.access_token) %>)"
-                                    >
-                                        <img src="/static/icons/delete.png" alt="delete_log" class="w-[20px]">
-                                    </button>
-                                </div>
-                    <%      }) %>
-                    <% } else { %>
-                        <span class="text-sm px-1">No logs to show</span>
-                    <% } %>
+                        <%      }) %>
+                        <% } else { %>
+                            <span class="text-sm px-1">No logs to show</span>
+                        <% } %>
+                    </div>
                 </div>
 
             </div>

@@ -94,6 +94,20 @@ APIRoutes
             res.status(500).send(error)
         }
     })
+    .post("/delete_hub_logs", ValidateAccessToken, async (req, res) => {
+        const { hubId } = req.query
+        try {
+            // const pg = new Postgres()
+            const deleted = await pg.delete_hub_logs(hubId)
+            // await pg.sql.end()
+            if (deleted) {
+                return res.status(200).send("OK")
+            }
+            res.status(200).send("No logs to delete")
+        } catch (error) {
+            res.status(500).send(error)
+        }
+    })
     // .get("/test", ValidateAccessToken, (req, res) => {
     //     res.json({ success: true })
     // })
