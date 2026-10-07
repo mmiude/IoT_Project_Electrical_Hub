@@ -171,12 +171,13 @@ void UiModel::name_device(uint64_t id, const std::string &name, int priority) {
     if (it == device_map.end()) return;
     UiDevice &dev = it->second;
 
+    bool first_time_naming = dev.pending; // device still waiting for a name!
     bool name_changed = dev.name != name;
     dev.name = name;
     dev.pending = false;
     save_name(dev);
 
-    if (name_changed) {
+    if (name_changed || first_time_naming) {
         controller_data name_msg{};
         name_msg.device_id = id;
         name_msg.type = DATA_TYPE_DEVICE_NAME;

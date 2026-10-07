@@ -9,8 +9,6 @@ namespace {
 constexpr uint32_t CARD_BG = 0x262626;
 constexpr uint32_t SWITCH_ON_COLOR = 0x4CAF50;
 
-// sliders work in tenths of a c/kWh (into-300) should be changed maybe?
-
 constexpr int32_t SLIDER_MIN = 0;
 constexpr int32_t SLIDER_MAX = 300;
 
@@ -199,6 +197,7 @@ void SettingsScreen::on_hub_id_changed(const std::string &hub_id)
 void SettingsScreen::on_wifi_online_changed(bool online)
 {
     lv_obj_set_style_bg_color(status_dot, lv_color_hex(online ? SWITCH_ON_COLOR : 0xE53935), 0);
+    if (wifi_text) lv_label_set_text(wifi_text, online ? "Wi-Fi connected" : "Wi-Fi - tap to set up");
 }
 
 void SettingsScreen::open_wifi_popup()
