@@ -86,7 +86,7 @@ void SettingsScreen::wifi_field_focused_cb(lv_event_t *e)
     lv_keyboard_set_textarea(g_screen->popup_keyboard, ta);
 }
 
-// bulk action (see UiModel::set_automation)
+// bulk action
 void SettingsScreen::automation_switch_cb(lv_event_t *e)
 {
     if (!g_screen) return;
@@ -232,7 +232,7 @@ void SettingsScreen::open_wifi_popup()
     popup_ssid_ta = lv_textarea_create(card);
     lv_obj_set_size(popup_ssid_ta, 416, 36);
     lv_textarea_set_one_line(popup_ssid_ta, true);
-    lv_textarea_set_max_length(popup_ssid_ta, 31); // wifi_credentials_t::ssid 32 bytes
+    lv_textarea_set_max_length(popup_ssid_ta, 31); 
     lv_textarea_set_placeholder_text(popup_ssid_ta, "Wi-Fi name (SSID)");
     lv_obj_add_event_cb(popup_ssid_ta, wifi_field_focused_cb, LV_EVENT_FOCUSED, NULL);
 
@@ -240,7 +240,7 @@ void SettingsScreen::open_wifi_popup()
     lv_obj_set_size(popup_password_ta, 416, 36);
     lv_textarea_set_one_line(popup_password_ta, true);
     lv_textarea_set_password_mode(popup_password_ta, true);
-    lv_textarea_set_max_length(popup_password_ta, 63); // wifi_credentials_t::password 64 bytes
+    lv_textarea_set_max_length(popup_password_ta, 63); 
     lv_textarea_set_placeholder_text(popup_password_ta, "Password");
     lv_obj_add_event_cb(popup_password_ta, wifi_field_focused_cb, LV_EVENT_FOCUSED, NULL);
 
@@ -359,14 +359,12 @@ lv_obj_t *SettingsScreen::build(UiModel &m)
     lv_label_set_text(hub_id_label, "Hub ID: pending...");
     lv_obj_set_style_text_color(hub_id_label, lv_color_hex(0x666666), 0);
 
-    // ---- Price threshold section ---
     lv_obj_t *threshold_label = lv_label_create(scr);
     lv_label_set_text(threshold_label, "Price Threshold");
     lv_obj_set_style_text_color(threshold_label, lv_color_hex(0x999999), 0);
     lv_obj_align(threshold_label, LV_ALIGN_TOP_LEFT, 14, 158);
 
     // automation toggle (bulk switch)
-    // see automation_switch_cb
     lv_obj_t *automation_label = lv_label_create(scr);
     lv_label_set_text(automation_label, "Automation");
     lv_obj_set_style_text_color(automation_label, lv_color_hex(0x999999), 0);

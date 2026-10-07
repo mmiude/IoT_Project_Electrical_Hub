@@ -30,10 +30,10 @@ struct UiDevice {
     float power{0.0f};
     float energy{0.0f};
 
-    bool pending{true};     // joined but the user has not given it a name + priority yet!
+    bool pending{true}; // joined but the user has not given it a name + priority yet!
 
     // for sync 
-    bool confirmed{false};  // seen from the controller since boot (used to drop stale devices after sync)
+    bool confirmed{false};  // seen from the controller since boot
 };
 
 class UiModelListener {
@@ -59,8 +59,8 @@ public:
 
     // restores named devices from nvs and call before screens are created
     void load();
-    // asks the controller to replay its state, call once the ui is ready to receive!
-    void request_sync();
+    
+    //void request_sync();
 
     // applies one message coming from the controller
     void handle_message(const controller_data &msg);

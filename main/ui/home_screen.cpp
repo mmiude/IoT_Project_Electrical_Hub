@@ -13,14 +13,6 @@ constexpr uint32_t PRICE_COLOR = 0x4CAF50;
 constexpr uint32_t USAGE_COLOR = 0xFB8C00;
 constexpr uint32_t SWITCH_ON_COLOR = 0x4CAF50;
 
-// a live device list below 
-
-// home screen implements UiModelListener and is kept as a function
-// local static in create_home_screen() -> it (and every lv_obj_t it owns) lives for as long as
-// the app runs, same as the other screens (screen_manager never destroys a screen, just hides it) this is better imo
-// that will be the main idea...
-
-// threshold chip shows both cutoffs now (settings will have both sliders)
 
 class HomeScreen : public UiModelListener {
 public:

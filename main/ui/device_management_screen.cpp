@@ -61,7 +61,7 @@ private:
 
     std::map<uint64_t, DeviceRow> rows;
 
-    // edit popup - only one open at a time
+    // edit popup, only one open at a time
     lv_obj_t *popup_overlay{};
     lv_obj_t *popup_name_ta{};
     lv_obj_t *popup_priority_btns[3]{};
@@ -87,7 +87,7 @@ void DeviceManagementScreen::add_device_btn_cb(lv_event_t *)
     g_screen->model->open_network();
     lv_label_set_text(g_screen->add_device_label, "Listening...");
     lv_timer_t *t = lv_timer_create(add_device_reset_cb, JOIN_WINDOW_MS, g_screen->add_device_label);
-    lv_timer_set_repeat_count(t, 1); // one-shot, lvgl deletes it after it fires
+    lv_timer_set_repeat_count(t, 1);
 }
 
 void DeviceManagementScreen::add_device_reset_cb(lv_timer_t *timer)
@@ -307,7 +307,7 @@ void DeviceManagementScreen::open_edit_popup(uint64_t id)
     lv_textarea_set_placeholder_text(popup_name_ta, "Device name");
     lv_textarea_set_text(popup_name_ta, dev->name.c_str());
 
-    // tap swaps the button row below into keep/confirm - see set_delete_confirm_mode.
+    // tap swaps the button row below into keep/confirm
     lv_obj_t *delete_btn = create_icon_button(name_row, LV_SYMBOL_TRASH, 0x7A1F1F);
     lv_obj_add_event_cb(delete_btn, delete_btn_cb, LV_EVENT_CLICKED, NULL);
 
@@ -358,7 +358,7 @@ void DeviceManagementScreen::open_edit_popup(uint64_t id)
     lv_obj_center(save_lbl);
     lv_obj_add_event_cb(popup_save_btn, save_btn_cb, LV_EVENT_CLICKED, NULL);
 
-    // confirm set: hidden until the trash icon is tapped once (see set_delete_confirm_mode)
+    // confirm set, hidden until the trash icon is tapped once
     popup_keep_btn = lv_button_create(btn_row);
     lv_obj_set_size(popup_keep_btn, 200, 40);
     lv_obj_set_style_bg_color(popup_keep_btn, lv_color_hex(0x333333), 0);
