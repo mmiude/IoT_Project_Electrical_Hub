@@ -153,18 +153,18 @@ function DeviceAndHubModifyEvents(userId, hubId, access_token) {
 
                 const req = await fetch(apiRoute, reqData)
                 const { error } = await req.json()
-                if (!error && elem.value == 0) {
-                    deviceOnElem.style = "pointer-events: none"
-                    deviceOnLabelElem.style = "pointer-events: none"
-                    if (!deviceOnElem.checked) {
-                        deviceOnElem.click()
-                    }
-                    // deviceOnElem.checked = true
-                    window.location.reload()
-                    return
-                } else if (!error) {
-                    deviceOnElem.style = "pointer-events: default"
-                    deviceOnLabelElem.style = "pointer-events: default"
+                // if (!error && elem.value == 0) {
+                //     // deviceOnElem.style = "pointer-events: none"
+                //     // deviceOnLabelElem.style = "pointer-events: none"
+                //     if (!deviceOnElem.checked) {
+                //         deviceOnElem.click()
+                //     }
+                //     // deviceOnElem.checked = true
+                //     window.location.reload()
+                //     return
+                if (!error) {
+                    // deviceOnElem.style = "pointer-events: default"
+                    // deviceOnLabelElem.style = "pointer-events: default"
                     window.location.reload()
                     return
                 }
@@ -180,36 +180,36 @@ function DeviceAndHubModifyEvents(userId, hubId, access_token) {
         const devicePriorityElem = document.getElementById(`device_priority|${deviceId}`)
         // console.log(devicePriorityElem)
         const label = document.getElementById(`label_device_on|${deviceId}`)
-        if (devicePriorityElem.value == 0) {
-            elem.style = "pointer-events: none"
-            label.style = "pointer-events: none"
-        } else {
-            elem.addEventListener("change", async () => {
-                reqData.body = JSON.stringify({
-                    deviceId,
-                    type: "DATA_TYPE_COMMAND",
-                    data: {
-                        value: 0,
-                        value_int: 0,
-                        command: elem.checked ? "PLUG_ON" : "PLUG_OFF",
-                        c_value: "NONE" 
-                    }
-                    // command: elem.checked ? "PLUG_ON" : "PLUG_OFF",
-                    // deviceId
-                })
-                console.log(reqData)
-    
-                const req = await fetch(apiRoute, reqData)
-                const { error } = await req.json()
-                if (!error) {
-                    window.location.reload()
-                    // alert("Success")
-                    return
+        // if (devicePriorityElem.value == 0) {
+        //     elem.style = "pointer-events: none"
+        //     label.style = "pointer-events: none"
+        // } else {
+        elem.addEventListener("change", async () => {
+            reqData.body = JSON.stringify({
+                deviceId,
+                type: "DATA_TYPE_COMMAND",
+                data: {
+                    value: 0,
+                    value_int: 0,
+                    command: elem.checked ? "PLUG_ON" : "PLUG_OFF",
+                    c_value: "NONE" 
                 }
-                alert("Failed")
-                elem.checked = !elem.checked
+                // command: elem.checked ? "PLUG_ON" : "PLUG_OFF",
+                // deviceId
             })
-        }
+            console.log(reqData)
+
+            const req = await fetch(apiRoute, reqData)
+            const { error } = await req.json()
+            if (!error) {
+                window.location.reload()
+                // alert("Success")
+                return
+            }
+            alert("Failed")
+            elem.checked = !elem.checked
+        })
+        // }
     })
 
     thresholdInputs.forEach((elem) => {

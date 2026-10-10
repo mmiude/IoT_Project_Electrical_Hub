@@ -114,135 +114,267 @@ APIRoutes
     .get("/get_electricity_prices", GetElectricityPrices)
     .post("/send_device_data", SendDeviceData)
     .post("/send_command_to_hub", ValidateAccessToken, async (req, res) => {
-        const { userId, hubId } = req.query
-        // TODO: verify hub signature
-        // const pg = new Postgres()
-        const hub_signature = await pg.get_user_hub_signature(userId)
-        if (hub_signature == null) {
+        try {
+            const { userId, hubId } = req.query
+            const hub_signature = await pg.get_user_hub_signature(userId)
+            if (hub_signature == null) {
+                // await pg.sql.end()
+                return res.json({ error: true })
+            }
+            if (!verify(hub_signature, hubId)) {
+                // await pg.sql.end()
+                console.log("Signature verification error")
+                return res.json({ error: true })
+            }
+
+
+            // const { command, deviceId } = req.body
+            const { deviceId, type, data } = req.body
+            console.log(`${type} ${deviceId}`)
+
+            const targetWs = userSockets.get(hubId)
+            // console.log(`Websocket readystate: ${targetWs.readyState}`)
+            if (!targetWs || targetWs.readyState !== 1) {
+                // await pg.sql.end()
+                return res.json({ error: true })
+            }
+
+
+            let ws_success = true
+            const webSocketPayload = `${deviceId}|${type}|${data.value}|${data.value_int}|${data.command}|${data.c_value}`
+
+            targetWs.send(webSocketPayload, (error) => {
+                console.log(error)
+                if (error != null) ws_success = error;
+            })
+
+            if (!ws_success) {
+                console.log("ws_error")
+                // await pg.sql.end()
+                return res.json({ error: true })
+            }
+
+            let values = {}
+            let pg_success = false
+            let log_message = ""
+            switch (type) {
+                case "DATA_TYPE_COMMAND":
+                    switch (data.command) {
+                        case "PLUG_ON":
+                            values = {
+                                is_on: true
+                            }
+                            pg_success = await pg.update_device(deviceId, values)
+                            if (pg_success) {
+                                log_message = `Device ${deviceId} turned ON.`
+                            }
+                            // console.log(pg_success)
+                            break
+                        case "PLUG_OFF":
+                            values = {
+                                is_on: false
+                            }
+                            pg_success = await pg.update_device(deviceId, values)
+                            if (pg_success) {
+                                log_message = `Device ${deviceId} turned OFF.`
+                            }
+                            // console.log(pg_success)
+                            break
+                        default:
+                            break
+                    }
+                    break;
+                case "DATA_TYPE_DEVICE_NAME":
+                    values = {
+                        name: data.c_value
+                    }
+                    pg_success = await pg.update_device(deviceId, values)
+                    if (pg_success) {
+                        log_message = `Device ${deviceId} name updated to "${values.name}".`
+                    }
+                    // console.log(pg_success)
+
+                    break
+                case "DATA_TYPE_PRIORITY":
+                    console.log(data.value_int)
+                    values = {
+                        // priority: data.value_int == 0 ? "HIGH" : data.value_int == 1 ? "MED" : "LOW"
+                        priority: data.value_int == 0 ? "HIGH": data.value_int == 1 ? "LOW" : "MED"
+                    }
+                    pg_success = await pg.update_device(deviceId, values)
+                    if (pg_success) {
+                        log_message = `Device ${deviceId} priority updated to ${values.priority}.`
+                    }
+                    // console.log(pg_success)
+                    break
+                case "DATA_TYPE_THRESHOLD_MED":
+                    values = {
+                        threshold_med: data.value
+                    }
+                    pg_success = await pg.update_hub(hubId, values)
+                    if (pg_success) {
+                        log_message = `Hub ${hubId} MED devices threshold updated to ${values.threshold_med}.`
+                    }
+                    break
+                case "DATA_TYPE_THRESHOLD_LOW":
+                    values = {
+                        threshold_low: data.value
+                    }
+                    pg_success = await pg.update_hub(hubId, values)
+                    if (pg_success) {
+                        log_message = `Hub ${hubId} LOW devices threshold updated to ${values.threshold_low}.`
+                    }
+                    break
+                default:
+                    break
+            }
+            console.log(pg_success)
+
+            if (!pg_success) {
+                console.log("pg_error")
+                // await pg.sql.end()
+                return res.json({ error: true })
+            }
+            const logged = await pg.log_to_hub(hubId, log_message);
             // await pg.sql.end()
-            return res.json({ error: true })
+            if (!logged) {
+                console.log("log error")
+                res.json({ error: true })
+            }
+            res.json({ error: false })
         }
-        if (!verify(hub_signature, hubId)) {
-            // await pg.sql.end()
-            console.log("Signature verification error")
-            return res.json({ error: true })
-        }
-
-
-        // const { command, deviceId } = req.body
-        const { deviceId, type, data } = req.body
-        console.log(`${type} ${deviceId}`)
-
-        const targetWs = userSockets.get(hubId)
-        console.log(targetWs.readyState)
-        if (!targetWs || targetWs.readyState !== 1) {
-            // await pg.sql.end()
-            return res.json({ error: true })
-        }
-
-
-        let ws_success = true
-        const webSocketPayload = `${deviceId}|${type}|${data.value}|${data.value_int}|${data.command}|${data.c_value}`
-
-        targetWs.send(webSocketPayload, (error) => {
-            console.log(error)
-            if (error != null) ws_success = error;
-        })
-
-        if (!ws_success) {
-            console.log("ws_error")
-            // await pg.sql.end()
-            return res.json({ error: true })
-        }
-
-        let values = {}
-        let pg_success = false
-        let log_message = ""
-        switch (type) {
-            case "DATA_TYPE_COMMAND":
-                switch (data.command) {
-                    case "PLUG_ON":
-                        values = {
-                            is_on: true
-                        }
-                        pg_success = await pg.update_device(deviceId, values)
-                        if (pg_success) {
-                            log_message = `Device ${deviceId} turned ON.`
-                        }
-                        // console.log(pg_success)
-                        break
-                    case "PLUG_OFF":
-                        values = {
-                            is_on: false
-                        }
-                        pg_success = await pg.update_device(deviceId, values)
-                        if (pg_success) {
-                            log_message = `Device ${deviceId} turned OFF.`
-                        }
-                        // console.log(pg_success)
-                        break
-                    default:
-                        break
-                }
-                break;
-            case "DATA_TYPE_DEVICE_NAME":
-                values = {
-                    name: data.c_value
-                }
-                pg_success = await pg.update_device(deviceId, values)
-                if (pg_success) {
-                    log_message = `Device ${deviceId} name updated to "${values.name}".`
-                }
-                // console.log(pg_success)
-
-                break
-            case "DATA_TYPE_PRIORITY":
-                console.log(data.value_int)
-                values = {
-                    // priority: data.value_int == 0 ? "HIGH" : data.value_int == 1 ? "MED" : "LOW"
-                    priority: data.value_int == 0 ? "HIGH": data.value_int == 1 ? "LOW" : "MED"
-                }
-                pg_success = await pg.update_device(deviceId, values)
-                if (pg_success) {
-                    log_message = `Device ${deviceId} priority updated to ${values.priority}.`
-                }
-                // console.log(pg_success)
-                break
-            case "DATA_TYPE_THRESHOLD_MED":
-                values = {
-                    threshold_med: data.value
-                }
-                pg_success = await pg.update_hub(hubId, values)
-                if (pg_success) {
-                    log_message = `Hub ${hubId} MED devices threshold updated to ${values.threshold_med}.`
-                }
-                break
-            case "DATA_TYPE_THRESHOLD_LOW":
-                values = {
-                    threshold_low: data.value
-                }
-                pg_success = await pg.update_hub(hubId, values)
-                if (pg_success) {
-                    log_message = `Hub ${hubId} LOW devices threshold updated to ${values.threshold_low}.`
-                }
-                break
-            default:
-                break
-        }
-        console.log(pg_success)
-
-        if (!pg_success) {
-            console.log("pg_error")
-            // await pg.sql.end()
-            return res.json({ error: true })
-        }
-        const logged = await pg.log_to_hub(hubId, log_message);
-        // await pg.sql.end()
-        if (!logged) {
-            console.log("log error")
+        catch (error) {
             res.json({ error: true })
         }
-        res.json({ error: false })
+        // const { userId, hubId } = req.query
+        // // TODO: verify hub signature
+        // // const pg = new Postgres()
+        // const hub_signature = await pg.get_user_hub_signature(userId)
+        // if (hub_signature == null) {
+        //     // await pg.sql.end()
+        //     return res.json({ error: true })
+        // }
+        // if (!verify(hub_signature, hubId)) {
+        //     // await pg.sql.end()
+        //     console.log("Signature verification error")
+        //     return res.json({ error: true })
+        // }
+
+
+        // // const { command, deviceId } = req.body
+        // const { deviceId, type, data } = req.body
+        // console.log(`${type} ${deviceId}`)
+
+        // const targetWs = userSockets.get(hubId)
+        // // console.log(`Websocket readystate: ${targetWs.readyState}`)
+        // if (!targetWs || targetWs.readyState !== 1) {
+        //     // await pg.sql.end()
+        //     return res.json({ error: true })
+        // }
+
+
+        // let ws_success = true
+        // const webSocketPayload = `${deviceId}|${type}|${data.value}|${data.value_int}|${data.command}|${data.c_value}`
+
+        // targetWs.send(webSocketPayload, (error) => {
+        //     console.log(error)
+        //     if (error != null) ws_success = error;
+        // })
+
+        // if (!ws_success) {
+        //     console.log("ws_error")
+        //     // await pg.sql.end()
+        //     return res.json({ error: true })
+        // }
+
+        // let values = {}
+        // let pg_success = false
+        // let log_message = ""
+        // switch (type) {
+        //     case "DATA_TYPE_COMMAND":
+        //         switch (data.command) {
+        //             case "PLUG_ON":
+        //                 values = {
+        //                     is_on: true
+        //                 }
+        //                 pg_success = await pg.update_device(deviceId, values)
+        //                 if (pg_success) {
+        //                     log_message = `Device ${deviceId} turned ON.`
+        //                 }
+        //                 // console.log(pg_success)
+        //                 break
+        //             case "PLUG_OFF":
+        //                 values = {
+        //                     is_on: false
+        //                 }
+        //                 pg_success = await pg.update_device(deviceId, values)
+        //                 if (pg_success) {
+        //                     log_message = `Device ${deviceId} turned OFF.`
+        //                 }
+        //                 // console.log(pg_success)
+        //                 break
+        //             default:
+        //                 break
+        //         }
+        //         break;
+        //     case "DATA_TYPE_DEVICE_NAME":
+        //         values = {
+        //             name: data.c_value
+        //         }
+        //         pg_success = await pg.update_device(deviceId, values)
+        //         if (pg_success) {
+        //             log_message = `Device ${deviceId} name updated to "${values.name}".`
+        //         }
+        //         // console.log(pg_success)
+
+        //         break
+        //     case "DATA_TYPE_PRIORITY":
+        //         console.log(data.value_int)
+        //         values = {
+        //             // priority: data.value_int == 0 ? "HIGH" : data.value_int == 1 ? "MED" : "LOW"
+        //             priority: data.value_int == 0 ? "HIGH": data.value_int == 1 ? "LOW" : "MED"
+        //         }
+        //         pg_success = await pg.update_device(deviceId, values)
+        //         if (pg_success) {
+        //             log_message = `Device ${deviceId} priority updated to ${values.priority}.`
+        //         }
+        //         // console.log(pg_success)
+        //         break
+        //     case "DATA_TYPE_THRESHOLD_MED":
+        //         values = {
+        //             threshold_med: data.value
+        //         }
+        //         pg_success = await pg.update_hub(hubId, values)
+        //         if (pg_success) {
+        //             log_message = `Hub ${hubId} MED devices threshold updated to ${values.threshold_med}.`
+        //         }
+        //         break
+        //     case "DATA_TYPE_THRESHOLD_LOW":
+        //         values = {
+        //             threshold_low: data.value
+        //         }
+        //         pg_success = await pg.update_hub(hubId, values)
+        //         if (pg_success) {
+        //             log_message = `Hub ${hubId} LOW devices threshold updated to ${values.threshold_low}.`
+        //         }
+        //         break
+        //     default:
+        //         break
+        // }
+        // console.log(pg_success)
+
+        // if (!pg_success) {
+        //     console.log("pg_error")
+        //     // await pg.sql.end()
+        //     return res.json({ error: true })
+        // }
+        // const logged = await pg.log_to_hub(hubId, log_message);
+        // // await pg.sql.end()
+        // if (!logged) {
+        //     console.log("log error")
+        //     res.json({ error: true })
+        // }
+        // res.json({ error: false })
     })
     // .get("/test", async (req, res) => {
     //     // try {
