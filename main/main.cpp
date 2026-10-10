@@ -21,10 +21,10 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "network_info.h"
-#include "IPStack.h"
+// #include "IPStack.h"
 
-#include "jwt.h"
-#include "CloudCommunication.h"
+// #include "jwt.h"
+// #include "CloudCommunication.h"
 
 #include "HubController.h"
 #include "HubControllerEnums.h"
