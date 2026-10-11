@@ -67,7 +67,7 @@ Figure 3: Changing Wi-Fi credentials in the settings menu.
 ## 🙀 Wait there is more! 
 
 ### 🗑️ Deleting a Device: 
-You can remove a plug cleanly through the UI menu or if you factory reset the plug hardware itself, Spike Striker will automatically notice it's gone and scrub it from system memory. 
+You can remove a plug cleanly through the UI menu. However, clean and easy way is to factory reset the plug hardware itself, Spike Striker will automatically notice it's gone and scrub it from system memory. 
 
 ### 🚦The Official LED Status Survival Guide:
 * **🟢 Solid Green:** Healthy, active system. Everything is fine and energy is flowing.
@@ -76,7 +76,7 @@ You can remove a plug cleanly through the UI menu or if you factory reset the pl
 
 ## ✨ Disclaimer & Credits
 ### ⚡"This is the way" (To lower your electircity bill) 
-* **Spike Striker** takes zero responsibility for cold showers, unboiled tea or sudden darkness occurring during peak market hours. Blame Nord Pool, no the codebase.
+* **Spike Striker** takes zero responsibility for cold showers, unboiled tea or sudden darkness occurring during peak market hours. Blame Nord Pool, not the codebase.
 
-< Built as an IoT Project to prove that saving money doesn't require Jedi wisdom - just smart endpoints, Zigbee network and low-cost electrons. 
+> Built as an IoT Project to prove that saving money doesn't require Jedi wisdom - just smart endpoints, Zigbee network and low-cost electrons. 
 
