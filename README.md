@@ -49,24 +49,24 @@ Video 5: Spike Striker ruthlessly cutting power during a price peak.
 
 ## 🦄 What Else?  (Features, Quirks & LED Guide) 
 
-### Ghost Plugs (Disconnected Devices):
+### 👻 Ghost Plugs (Disconnected Devices):
 If a smart plug loses power or walks out of Zigbee range, the UI marks it as Disconnected so you aren't left guessing. 
 <img width="1074" height="1152" alt="Näyttökuva 2026-10-11 162233" src="https://github.com/user-attachments/assets/e8c1df01-5288-4049-8be5-ab47b7749e60" />
 Figure 1: UI showing a disconnected plug.
 
-### Live Power Tracking: 
+### 💥 Live Power Tracking: 
 Keep an eye on your real-time wattage directly on the device screen. 
 <img width="1138" height="1140" alt="Näyttökuva 2026-10-11 162500" src="https://github.com/user-attachments/assets/92dab228-e64b-4189-85f5-4c8c997e1bed" />
 Figure 2: Live power consumption stats on the device screen. 
 
-## Wi-Fi Management:
+### 🛜 Wi-Fi Management:
 Update your Wi-Fi credentials effortlessly in the settings tab. 
-<img width="1138" height="1140" alt="Näyttökuva 2026-10-11 162500" src="https://github.com/user-attachments/assets/e48a4f35-19c4-46ad-be67-282714d3eae9" />
+<img width="1096" height="1150" alt="Näyttökuva 2026-10-11 165320" src="https://github.com/user-attachments/assets/bbc58a04-d79a-4e03-9a41-371d90fc607b" />
 Figure 3: Changing Wi-Fi credentials in the settings menu. 
 
 ## 🙀 Wait there is more! 
 
-### Deleting a Device: 
+### 🗑️ Deleting a Device: 
 You can remove a plug cleanly through the UI menu or if you factory reset the plug hardware itself, Spike Striker will automatically notice it's gone and scrub it from system memory. 
 
 ### 🚦The Official LED Status Survival Guide:
@@ -74,9 +74,9 @@ You can remove a plug cleanly through the UI menu or if you factory reset the pl
 * **🟡 Blinking Yellow:** Network open - ready to pair new plugs.
 * **🔴 Solid Red:** Inactive Zigbee network. If your plugs are currently plugged in during a red light emergency, a quick system reset is recommended! 
 
-## Disclaimer & Credits
+## ✨ Disclaimer & Credits
 ### ⚡"This is the way" (To lower your electircity bill) 
 * **Spike Striker** takes zero responsibility for cold showers, unboiled tea or sudden darkness occurring during peak market hours. Blame Nord Pool, no the codebase.
 
-Built as an IoT Project to prove that saving money doesn't require Jedi wisdom - just smart endpoints, Zigbee network and low-cost electrons. 
+< Built as an IoT Project to prove that saving money doesn't require Jedi wisdom - just smart endpoints, Zigbee network and low-cost electrons. 
 
