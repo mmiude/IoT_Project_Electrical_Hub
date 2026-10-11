@@ -16,30 +16,35 @@ Operating Spike Striker is easy peasy lemon squeezy. Here is how to use it:
   3. Make sure your plug is in pairing mode and watch the magic happen.
      
 https://github.com/user-attachments/assets/be181977-6a08-4ef0-acd4-ba78d705f8cb
+
 Video 1: Hunting for new smart plugs in the wild. 
 
 ### 2. Toggling Devices via UI
 Want to manually turn something on or off? You can toggle devices straight from the interface... assuming the electricity market permits your lifestyle choices. If a price threshold is violated, the system will respectfully decline your request.
 
 https://github.com/user-attachments/assets/3a8e4d29-ae25-401a-a869-aec6a67d089f
+
 Video 2: Toggling a plug (when the market allows it).
 
 ### 3. Updating Device Info & Priority
 Gave your plug a promotion? You can update any device's name and assigned priority level directly in the settings menu
 
 https://github.com/user-attachments/assets/2b2a0ed3-e625-4f07-b736-23ca9aa59911
+
 Video 3: Renaming devices and assigning priority
 
 ### 4. Modifying Price Thresholds
 Tired of living in the dark? Or feeling extra frugal today? You can adjust your low and medium price thresholds on the fly via the UI. Spike Striker will immediately recalculate which appliances deserve electricity.
 
 https://github.com/user-attachments/assets/9a24d0ad-a1df-48f8-b79c-9db2f6440dd8
+
 Video 4: Setting new threshold level
 
 ### 5. Automated Price Spike Execution (The "Market Police") 
 When live electricity prices exceed your configured thresholds, Spike Striker takes immediate action, including strict override prevention: you cannot manually turn devices back on while price is spiking. 
 
 https://github.com/user-attachments/assets/e40893bd-41bb-4a07-a981-18652280ea2b
+
 Video 5: Spike Striker ruthlessly cutting power during a price peak. 
 
 ## 🦄 What Else?  (Features, Quirks & LED Guide) 
@@ -64,7 +69,7 @@ Figure 3: Changing Wi-Fi credentials in the settings menu.
 ### Deleting a Device: 
 You can remove a plug cleanly through the UI menu or if you factory reset the plug hardware itself, Spike Striker will automatically notice it's gone and scrub it from system memory. 
 
-###🚦The Official LED Status Survival Guide:
+### 🚦The Official LED Status Survival Guide:
 * **🟢 Solid Green:** Healthy, active system. Everything is fine and energy is flowing.
 * **🟡 Blinking Yellow:** Network open - ready to pair new plugs.
 * **🔴 Solid Red:** Inactive Zigbee network. If your plugs are currently plugged in during a red light emergency, a quick system reset is recommended! 
